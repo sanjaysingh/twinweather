@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#14120e" />
+    <meta name="description" content="Weather for any city." />
+    <title>Twinweather</title>
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,500..700;1,9..144,500&family=Outfit:wght@100..900&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body data-sky="idle">
+    <div class="progress" id="progress" hidden>
+      <span></span>
+    </div>
+    <div class="shell">
+      <p class="status" id="status" role="status"></p>
+
+      <main id="weather" aria-live="polite">
+        <section class="stage">
+          <div class="place">
+            <div class="condition-row">
+              <p class="condition" id="condition">
+                <span class="condition-icon" id="condition-icon"></span>
+                <span id="condition-label">Waiting on the sky</span>
+              </p>
+              <div class="actions">
+                <button class="icon-btn" id="open-search" type="button" aria-label="Search for a city" aria-expanded="false" aria-controls="overlay">
+                  <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <circle cx="11" cy="11" r="6.2"></circle>
+                    <path d="M16 16.5 20 20.5"></path>
+                  </svg>
+                </button>
+                <button class="icon-btn" id="locate" type="button" aria-label="Use my location">
+                  <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <circle cx="12" cy="12" r="3.2"></circle>
+                    <path d="M12 3.5v2.2M12 18.3v2.2M3.5 12h2.2M18.3 12h2.2"></path>
+                    <circle cx="12" cy="12" r="7.2"></circle>
+                  </svg>
+                </button>
+              </div>
+            </div>
+            <div class="place-row">
+              <div class="place-id">
+                <h1 class="place-name" id="place-name">Choose a place</h1>
+                <p class="place-meta" id="place-region"></p>
+              </div>
+              <div class="when">
+                <time id="local-time"></time>
+                <p class="sunline" id="sunline" hidden>
+                  <svg class="sun-mark" viewBox="0 0 24 24" aria-hidden="true">
+                    <circle cx="12" cy="12" r="3.2"></circle>
+                    <path d="M12 3.4v2.2M12 18.4v2.2M3.4 12h2.2M18.4 12h2.2M6 6l1.5 1.5M16.5 16.5 18 18M18 6l-1.5 1.5M7.5 16.5 6 18"></path>
+                  </svg>
+                  <span id="sun-times"></span>
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <section class="now" aria-label="Current temperature">
+            <p class="now-reading">
+              <span class="now-c"><span class="num" id="c-now">—</span><span class="unit">°C</span></span>
+              <span class="pipe" aria-hidden="true">|</span>
+              <span class="now-f"><span class="num" id="f-now">—</span><span class="unit">°F</span></span>
+            </p>
+            <p class="now-feels"><span>Feels</span><span class="c"><span id="c-feels">—</span>°C</span><span class="pipe" aria-hidden="true">|</span><span class="f"><span id="f-feels">—</span>°F</span></p>
+            <p class="now-range"><span class="c"><span id="c-low">—</span>–<span id="c-high">—</span>°C</span><span class="pipe" aria-hidden="true">|</span><span class="f"><span id="f-low">—</span>–<span id="f-high">—</span>°F</span></p>
+          </section>
+        </section>
+
+        <dl class="facts" id="facts">
+          <div>
+            <dt>Humidity</dt>
+            <dd id="humidity">—</dd>
+          </div>
+          <div>
+            <dt>Wind</dt>
+            <dd id="wind">—</dd>
+          </div>
+          <div>
+            <dt>Rain</dt>
+            <dd id="rain">—</dd>
+          </div>
+          <div>
+            <dt>UV</dt>
+            <dd id="uv">—</dd>
+          </div>
+        </dl>
+
+        <section class="panel" aria-labelledby="hours-title">
+          <div class="panel-head">
+            <h2 id="hours-title">Next 24 hours</h2>
+          </div>
+          <div class="hours" id="hours" tabindex="0"></div>
+        </section>
+
+        <section class="panel" aria-labelledby="days-title">
+          <div class="panel-head">
+            <h2 id="days-title">Seven days</h2>
+          </div>
+          <div class="day-head" aria-hidden="true">
+            <span></span>
+            <span></span>
+            <span class="day-note-spacer"></span>
+            <span>Low</span>
+            <span>High</span>
+          </div>
+          <ol class="days" id="days"></ol>
+        </section>
+      </main>
+
+      <footer class="colophon">
+        <a href="https://open-meteo.com/">Weather data by Open-Meteo.com</a>
+      </footer>
+    </div>
+
+    <div class="overlay" id="overlay" hidden>
+      <button class="overlay-scrim" type="button" data-close aria-label="Close search"></button>
+      <div class="overlay-sheet" role="dialog" aria-modal="true" aria-label="Search for a city">
+        <form class="finder" id="finder" role="search">
+          <label class="search">
+            <span class="sr-only">Search for a city</span>
+            <input
+              id="q"
+              type="search"
+              name="q"
+              placeholder="Search a city"
+              enterkeyhint="search"
+              autocomplete="off"
+              autocapitalize="words"
+              spellcheck="false"
+              aria-autocomplete="list"
+              aria-controls="suggest"
+              aria-expanded="false"
+            />
+          </label>
+          <button class="icon-btn" type="button" data-close aria-label="Close search">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M6 6l12 12M18 6 6 18"></path>
+            </svg>
+          </button>
+        </form>
+        <ul class="suggest" id="suggest" role="listbox" hidden></ul>
+        <div class="chips" id="chips" role="list"></div>
+      </div>
+    </div>
+    <script src="/app.js" type="module"></script>
+  </body>
+</html>

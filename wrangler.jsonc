@@ -1,0 +1,28 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "twinweather",
+  "account_id": "762ce683f0c51592bb1480f5fd3e7b7e",
+  "main": "src/index.ts",
+  "routes": [
+    {
+      "pattern": "twinweather.sanjaysingh.net/api/*",
+      "zone_id": "0cf0b9c4853d3580457fd97e4081d5d9"
+    }
+  ],
+  "compatibility_date": "2026-10-10",
+  "compatibility_flags": ["nodejs_compat"],
+  "observability": {
+    "enabled": true,
+    "traces": {
+      "enabled": true
+    }
+  },
+  "cache": {
+    "enabled": true
+  },
+  "assets": {
+    "directory": "./public",
+    "not_found_handling": "single-page-application",
+    "run_worker_first": ["/api/*"]
+  }
+}
