@@ -477,6 +477,8 @@ const MENTION_CHANCE = 15;
  * The day's sky is whatever covers the most hours between sunrise and sunset.
  * Precipitation replaces that sky when it is the most common condition, or
  * when its chance is at least 15%. A 2% drizzle hour does not rename a sunny day.
+ * Dry days only carry POP from actual wet hours, so clear-sky model odds do not
+ * become a sunny-day rain percentage.
  */
 function summarizeDaylight(hours: SunHour[]): { weatherCode: number; precipProb: number } | null {
   if (hours.length === 0) return null;
@@ -484,12 +486,12 @@ function summarizeDaylight(hours: SunHour[]): { weatherCode: number; precipProb:
   const wet = hours.filter((hour) => hour.code >= 51 && hour.precipProb > 0);
   const sky = hours.filter((hour) => hour.code < 51);
   const skyCode = daytimeWeatherCode(sky.map((hour) => hour.code));
-  const dayPop = Math.max(...hours.map((hour) => hour.precipProb));
+  const wetPop = wet.length > 0 ? Math.max(...wet.map((hour) => hour.precipProb)) : 0;
   const wetSummary = wet.length > 0 ? mainPrecipitation(wet) : null;
   const wetDominates = wetSummary != null && wet.length > mostCommonCount(sky.map((hour) => hour.code));
   if (wetSummary && (wetDominates || wetSummary.precipProb >= MENTION_CHANCE)) return wetSummary;
-  if (skyCode == null) return wetSummary ?? { weatherCode: hours[0]!.code, precipProb: dayPop };
-  return { weatherCode: skyCode, precipProb: dayPop };
+  if (skyCode == null) return wetSummary ?? { weatherCode: hours[0]!.code, precipProb: wetPop };
+  return { weatherCode: skyCode, precipProb: wetPop };
 }
 
 /** Precipitation type with the most daylight water, and that type's highest chance. */

@@ -411,7 +411,7 @@ function renderDays(forecast) {
     const sky = document.createElement("span");
     sky.className = "day-sky";
     sky.innerHTML = icon(day.weatherCode, true);
-    if (day.precipProb > 0 && (day.weatherCode >= 51 || day.precipProb >= 15)) {
+    if (day.weatherCode >= 51 && day.precipProb >= 15) {
       const pop = document.createElement("span");
       pop.className = "pop";
       pop.textContent = `${Math.round(day.precipProb)}%`;
