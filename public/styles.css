@@ -77,17 +77,37 @@ body::before {
 }
 
 .progress {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 2px;
-  z-index: 5;
-  overflow: hidden;
-  background: transparent;
+  position: sticky;
+  z-index: 15;
+  top: env(safe-area-inset-top, 0px);
+  margin: 0 calc(-1 * max(1.15rem, env(safe-area-inset-right))) 0.85rem calc(-1 * max(1.15rem, env(safe-area-inset-left)));
+  padding: 0.15rem max(1.15rem, env(safe-area-inset-right)) 0 max(1.15rem, env(safe-area-inset-left));
+  pointer-events: none;
+  background: color-mix(in srgb, var(--wash) 88%, transparent);
+  backdrop-filter: blur(8px);
 }
 
-.progress span {
+.progress-label {
+  display: inline-block;
+  margin: 0 0 0.45rem;
+  padding: 0.24rem 0.7rem;
+  border-radius: 999px;
+  background: rgba(12, 10, 8, 0.78);
+  color: var(--paper);
+  font-size: 0.8rem;
+  line-height: 1.2;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+}
+
+.progress-bar {
+  height: 3px;
+  margin: 0 calc(-1 * max(1.15rem, env(safe-area-inset-right))) 0 calc(-1 * max(1.15rem, env(safe-area-inset-left)));
+  overflow: hidden;
+  background: rgba(246, 241, 232, 0.16);
+}
+
+.progress-bar > span {
   display: block;
   height: 100%;
   width: 40%;
@@ -144,13 +164,28 @@ body::before {
 }
 
 .sun-mark {
-  width: 13px;
-  height: 13px;
+  width: 16px;
+  height: 16px;
   flex: none;
+  color: #ffd34d;
   fill: none;
   stroke: currentColor;
   stroke-width: 1.6;
   stroke-linecap: round;
+}
+
+.icon-sun .rays {
+  fill: none;
+  stroke: #ffd34d;
+  stroke-width: 1.7;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.icon-sun .disc {
+  fill: #ffd34d;
+  stroke: #e8a820;
+  stroke-width: 1.15;
 }
 
 .actions { display: flex; gap: 0.4rem; }
@@ -582,6 +617,7 @@ body.is-searching { overflow: hidden; }
 @media (max-width: 420px) {
   .when time { font-size: 0.84rem; }
   .sunline { font-size: 0.68rem; }
+  .sun-mark { width: 14px; height: 14px; }
 }
 
 @media (max-width: 380px) {
@@ -595,5 +631,10 @@ body.is-searching { overflow: hidden; }
   *, *::before, *::after {
     animation: none !important;
     transition: none !important;
+  }
+
+  .progress-bar > span {
+    width: 100%;
+    transform: none;
   }
 }

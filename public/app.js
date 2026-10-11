@@ -1,3 +1,5 @@
+"use strict";
+
 const QUICK = [
   { name: "New York", admin1: "New York", country: "United States", latitude: 40.71, longitude: -74.01 },
   { name: "London", admin1: "England", country: "United Kingdom", latitude: 51.51, longitude: -0.13 },
@@ -38,6 +40,10 @@ const CONDITIONS = {
   99: "Thunderstorm with hail",
 };
 
+const FORECAST_KEY = "twinweather-forecasts";
+const STALE_MS = 10 * 60 * 1000;
+const FORECAST_TIMEOUT_MS = 20000;
+
 const $ = (id) => document.getElementById(id);
 
 const state = {
@@ -46,6 +52,11 @@ const state = {
   searchAbort: null,
   forecastAbort: null,
   activeSuggest: -1,
+  fetchedAt: 0,
+  refreshId: 0,
+  refreshing: false,
+  locating: false,
+  hasForecast: false,
 };
 
 const chips = $("chips");
@@ -108,6 +119,7 @@ document.addEventListener("keydown", (event) => {
 
 $("locate").addEventListener("click", locate);
 
+watchForReturn();
 boot();
 
 if ("serviceWorker" in navigator) {
@@ -217,20 +229,24 @@ function closeSuggest() {
   state.activeSuggest = -1;
 }
 
-async function locate() {
+function locate() {
   if (!navigator.geolocation) {
     setStatus("This browser can't share a location. Search for a city instead.");
     return;
   }
-  setBusy(true);
-  setStatus("");
+  const locateId = ++state.refreshId;
+  state.locating = true;
+  state.forecastAbort?.abort();
+  setRefreshing(true, "Finding your location…");
   navigator.geolocation.getCurrentPosition(
     async (position) => {
+      if (locateId !== state.refreshId) return;
       const latitude = roundCoord(position.coords.latitude);
       const longitude = roundCoord(position.coords.longitude);
       try {
         const response = await fetch(`/api/reverse?latitude=${latitude}&longitude=${longitude}`);
         const payload = await response.json();
+        if (locateId !== state.refreshId) return;
         const place = payload.result || {
           name: "Current location",
           admin1: null,
@@ -238,14 +254,19 @@ async function locate() {
           latitude: Number(latitude),
           longitude: Number(longitude),
         };
+        state.locating = false;
         await selectPlace({ ...place, latitude: Number(latitude), longitude: Number(longitude) });
       } catch {
-        setBusy(false);
+        if (locateId !== state.refreshId) return;
+        state.locating = false;
+        setRefreshing(false);
         setStatus("Location found, but the place name didn't load. Try again.");
       }
     },
     () => {
-      setBusy(false);
+      if (locateId !== state.refreshId) return;
+      state.locating = false;
+      setRefreshing(false);
       setStatus("Location permission was blocked. Search for a city instead.");
     },
     { enableHighAccuracy: false, timeout: 8000, maximumAge: 300000 },
@@ -253,33 +274,59 @@ async function locate() {
 }
 
 async function selectPlace(place, { remember = true } = {}) {
-  state.place = {
-    name: place.name,
-    admin1: place.admin1 || "",
-    country: place.country || "",
-    latitude: Number(roundCoord(place.latitude)),
-    longitude: Number(roundCoord(place.longitude)),
-  };
+  const next = normalizePlace(place);
+  const previousKey = state.place ? placeKey(state.place) : "";
+  const alreadyShowing = previousKey === placeKey(next) && state.hasForecast;
+  state.locating = false;
+  state.place = next;
   if (remember) localStorage.setItem("twinweather-place", JSON.stringify(state.place));
   markChip(state.place);
-  setBusy(true);
-  setStatus("");
+
+  // Keep the last reading on screen, then ask for a new one. The page stays usable.
+  const cached = readCachedForecast(next);
+  if (!alreadyShowing && cached) {
+    try {
+      render(state.place, cached.forecast);
+      state.fetchedAt = Number(cached.savedAt) || 0;
+    } catch {
+      showPendingPlace(next);
+      state.fetchedAt = 0;
+    }
+  } else if (!alreadyShowing) {
+    showPendingPlace(next);
+    state.fetchedAt = 0;
+  }
+
+  const refreshId = ++state.refreshId;
+  const label = state.hasForecast ? "Refreshing weather…" : "Loading weather…";
+  setRefreshing(true, label);
   state.forecastAbort?.abort();
-  state.forecastAbort = new AbortController();
+  const abort = new AbortController();
+  state.forecastAbort = abort;
+  const timer = window.setTimeout(() => abort.abort(), FORECAST_TIMEOUT_MS);
   try {
     const response = await fetch(
       `/api/forecast?latitude=${state.place.latitude.toFixed(2)}&longitude=${state.place.longitude.toFixed(2)}`,
-      { signal: state.forecastAbort.signal },
+      { signal: abort.signal, cache: "no-cache" },
     );
     const payload = await response.json();
-    if (!response.ok) throw new Error(payload.error || "Forecast failed");
+    if (refreshId !== state.refreshId) return;
+    if (!response.ok || !isUsableForecast(payload)) throw new Error(payload.error || "Forecast failed");
     render(state.place, payload);
+    state.fetchedAt = Date.now();
+    writeCachedForecast(state.place, payload);
     setStatus("");
   } catch (error) {
-    if (error.name === "AbortError") return;
-    setStatus("The forecast didn't come through. Check your connection and try again.");
+    if (refreshId !== state.refreshId) return;
+    if (error.name === "AbortError" && abort !== state.forecastAbort) return;
+    setStatus(
+      state.hasForecast
+        ? "Couldn't refresh. Still showing the last weather."
+        : "The forecast didn't come through. Check your connection and try again.",
+    );
   } finally {
-    setBusy(false);
+    window.clearTimeout(timer);
+    if (refreshId === state.refreshId && !state.locating) setRefreshing(false);
   }
 }
 
@@ -330,6 +377,7 @@ function render(place, forecast) {
   const c = roundTemp(forecast.current.temperatureC);
   const f = roundTemp(toF(forecast.current.temperatureC));
   document.title = `${c}°C | ${f}°F ${place.name}`;
+  state.hasForecast = true;
 }
 
 function renderHours(forecast) {
@@ -491,9 +539,114 @@ function readSaved() {
   }
 }
 
-function setBusy(busy) {
-  $("progress").hidden = !busy;
-  document.body.setAttribute("aria-busy", busy ? "true" : "false");
+function watchForReturn() {
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "visible") refreshIfStale();
+  });
+  window.addEventListener("pageshow", () => refreshIfStale());
+  window.addEventListener("online", () => refreshIfStale());
+}
+
+function refreshIfStale() {
+  if (!state.place || state.refreshing || state.locating) return;
+  if (state.fetchedAt && Date.now() - state.fetchedAt < STALE_MS) return;
+  void selectPlace(state.place, { remember: false });
+}
+
+function showPendingPlace(place) {
+  state.hasForecast = false;
+  $("place-name").textContent = place.name;
+  $("place-region").textContent = [place.admin1, place.country].filter(Boolean).join(" · ");
+  $("condition-label").textContent = "Loading";
+  $("condition-icon").replaceChildren();
+  for (const id of ["c-now", "f-now", "c-feels", "f-feels", "c-low", "f-low", "c-high", "f-high"]) {
+    $(id).textContent = "—";
+  }
+  $("humidity").textContent = "—";
+  $("wind").textContent = "—";
+  $("rain").textContent = "—";
+  $("uv").textContent = "—";
+  $("hours").replaceChildren();
+  $("days").replaceChildren();
+  $("sunline").hidden = true;
+  document.title = place.name;
+}
+
+function normalizePlace(place) {
+  return {
+    name: place.name,
+    admin1: place.admin1 || "",
+    country: place.country || "",
+    latitude: Number(roundCoord(place.latitude)),
+    longitude: Number(roundCoord(place.longitude)),
+  };
+}
+
+function placeKey(place) {
+  return `${Number(place.latitude).toFixed(2)},${Number(place.longitude).toFixed(2)}`;
+}
+
+function readForecastCache() {
+  try {
+    const raw = localStorage.getItem(FORECAST_KEY);
+    if (!raw) return {};
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return {};
+    return parsed;
+  } catch {
+    return {};
+  }
+}
+
+function readCachedForecast(place) {
+  const entry = readForecastCache()[placeKey(place)];
+  if (!entry || !isUsableForecast(entry.forecast)) return null;
+  return entry;
+}
+
+function writeCachedForecast(place, forecast) {
+  try {
+    const all = readForecastCache();
+    all[placeKey(place)] = { place, forecast, savedAt: Date.now() };
+    const entries = Object.entries(all).filter(([, entry]) => entry && isUsableForecast(entry.forecast));
+    entries.sort((left, right) => (right[1].savedAt || 0) - (left[1].savedAt || 0));
+    localStorage.setItem(FORECAST_KEY, JSON.stringify(Object.fromEntries(entries.slice(0, 8))));
+  } catch {
+    // A blocked or full store should not hide the forecast already on screen.
+  }
+}
+
+function isUsableForecast(forecast) {
+  const current = forecast?.current;
+  if (!current || typeof forecast.timezone !== "string" || typeof current.time !== "string") return false;
+  if (typeof current.isDay !== "boolean") return false;
+  const numbers = [current.temperatureC, current.apparentC, current.humidity, current.weatherCode, current.windKmh, current.windDeg];
+  if (numbers.some((value) => typeof value !== "number" || !Number.isFinite(value))) return false;
+  if (!Array.isArray(forecast.hourly) || !Array.isArray(forecast.daily) || forecast.daily.length === 0) return false;
+  const today = forecast.daily[0];
+  if (!today || typeof today.minC !== "number" || typeof today.maxC !== "number") return false;
+  if (typeof today.weatherCode !== "number" || typeof today.sunrise !== "string" || typeof today.sunset !== "string") return false;
+  return forecast.hourly.every(
+    (hour) =>
+      hour &&
+      typeof hour.time === "string" &&
+      typeof hour.temperatureC === "number" &&
+      typeof hour.weatherCode === "number" &&
+      typeof hour.precipProb === "number" &&
+      typeof hour.isDay === "boolean",
+  );
+}
+
+function setRefreshing(active, label) {
+  state.refreshing = active;
+  const progress = $("progress");
+  if (active) {
+    progress.hidden = false;
+    if (label) $("progress-label").textContent = label;
+    setStatus("");
+    return;
+  }
+  progress.hidden = true;
 }
 
 function setStatus(message) {
@@ -516,9 +669,7 @@ function svg(paths) {
 }
 
 function sun() {
-  return svg(
-    `<circle cx="12" cy="12" r="3.2"/><path d="M12 3.5v2.1M12 18.4v2.1M3.5 12h2.1M18.4 12h2.1M6 6l1.5 1.5M16.5 16.5 18 18M18 6l-1.5 1.5M7.5 16.5 6 18"/>`,
-  );
+  return `<svg viewBox="0 0 24 24" class="icon-sun" aria-hidden="true"><path class="rays" fill="none" stroke="#ffd34d" stroke-width="1.7" stroke-linecap="round" d="M12 3.5v2.1M12 18.4v2.1M3.5 12h2.1M18.4 12h2.1M6 6l1.5 1.5M16.5 16.5 18 18M18 6l-1.5 1.5M7.5 16.5 6 18"/><circle class="disc" cx="12" cy="12" r="3.5" fill="#ffd34d" stroke="#e8a820" stroke-width="1.15"/></svg>`;
 }
 
 function moon() {
@@ -530,9 +681,7 @@ function cloud() {
 }
 
 function sunCloud() {
-  return svg(
-    `<circle cx="8" cy="8" r="2.2"/><path d="M8 3.6v1.2M8 11.2v1.2M3.6 8h1.2M11.2 8h1.2M4.8 4.8l.8.8M10.4 10.4l.8.8M10.4 5.6l-.8.8M5.6 10.4l-.8.8"/><path d="M9.2 18.2h8.2a2.8 2.8 0 0 0 .3-5.6 3.8 3.8 0 0 0-7.2-1.1 2.6 2.6 0 0 0-1.3 6.7z"/>`,
-  );
+  return `<svg viewBox="0 0 24 24" class="icon-sun" aria-hidden="true"><path class="rays" fill="none" stroke="#ffd34d" stroke-width="1.6" stroke-linecap="round" d="M8 3.6v1.2M8 11.2v1.2M3.6 8h1.2M11.2 8h1.2M4.8 4.8l.8.8M10.4 10.4l.8.8M10.4 5.6l-.8.8M5.6 10.4l-.8.8"/><circle class="disc" cx="8" cy="8" r="2.2" fill="#ffd34d" stroke="#e8a820" stroke-width="1.05"/><path fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" d="M9.2 18.2h8.2a2.8 2.8 0 0 0 .3-5.6 3.8 3.8 0 0 0-7.2-1.1 2.6 2.6 0 0 0-1.3 6.7z"/></svg>`;
 }
 
 function moonCloud() {

@@ -22,10 +22,11 @@
     <link rel="stylesheet" href="/styles.css" />
   </head>
   <body data-sky="idle">
-    <div class="progress" id="progress" hidden>
-      <span></span>
-    </div>
     <div class="shell">
+      <div class="progress" id="progress" role="status" hidden>
+        <p class="progress-label" id="progress-label">Refreshing weather…</p>
+        <div class="progress-bar" aria-hidden="true"><span></span></div>
+      </div>
       <p class="status" id="status" role="status"></p>
 
       <main id="weather" aria-live="polite">
@@ -60,9 +61,9 @@
               <div class="when">
                 <time id="local-time"></time>
                 <p class="sunline" id="sunline" hidden>
-                  <svg class="sun-mark" viewBox="0 0 24 24" aria-hidden="true">
-                    <circle cx="12" cy="12" r="3.2"></circle>
-                    <path d="M12 3.4v2.2M12 18.4v2.2M3.4 12h2.2M18.4 12h2.2M6 6l1.5 1.5M16.5 16.5 18 18M18 6l-1.5 1.5M7.5 16.5 6 18"></path>
+                  <svg class="sun-mark icon-sun" viewBox="0 0 24 24" aria-hidden="true">
+                    <path class="rays" fill="none" stroke="#ffd34d" stroke-width="1.7" stroke-linecap="round" d="M12 3.4v2.2M12 18.4v2.2M3.4 12h2.2M18.4 12h2.2M6 6l1.5 1.5M16.5 16.5 18 18M18 6l-1.5 1.5M7.5 16.5 6 18"></path>
+                    <circle class="disc" cx="12" cy="12" r="3.6" fill="#ffd34d" stroke="#e8a820" stroke-width="1.15"></circle>
                   </svg>
                   <span id="sun-times"></span>
                 </p>
@@ -157,6 +158,6 @@
         <div class="chips" id="chips" role="list"></div>
       </div>
     </div>
-    <script src="/app.js" type="module"></script>
+    <script src="/app.js"></script>
   </body>
 </html>
