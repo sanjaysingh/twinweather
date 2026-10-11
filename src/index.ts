@@ -273,6 +273,20 @@ function shapeForecast(payload: Record<string, unknown>): ForecastPayload | null
     sunsets.length,
   );
 
+  // Open-Meteo daily weather_code is the most severe hour in 24h, so one cloudy
+  // night hour can hide an otherwise sunny day. Prefer daytime hours instead.
+  const daytimeCodes = new Map<string, number[]>();
+  for (let i = 0; i < hourCount; i++) {
+    const hourTime = asString(hourlyTimes[i]);
+    const hourCode = asNumber(hourlyCodes[i]);
+    const hourDay = asNumber(hourlyDay[i]);
+    if (!hourTime || hourCode == null || hourDay !== 1) continue;
+    const date = hourTime.slice(0, 10);
+    const list = daytimeCodes.get(date);
+    if (list) list.push(hourCode);
+    else daytimeCodes.set(date, [hourCode]);
+  }
+
   const days: ForecastPayload["daily"] = [];
   for (let i = 0; i < dayCount && days.length < 7; i++) {
     const date = asString(dates[i]);
@@ -287,7 +301,7 @@ function shapeForecast(payload: Record<string, unknown>): ForecastPayload | null
     }
     days.push({
       date,
-      weatherCode: code,
+      weatherCode: daytimeWeatherCode(daytimeCodes.get(date) ?? []) ?? code,
       maxC,
       minC,
       precipProb,
@@ -394,6 +408,33 @@ function coordinate(raw: string | null, min: number, max: number): string | null
   const value = Number(raw);
   if (!Number.isFinite(value) || value < min || value > max) return null;
   return value.toFixed(2);
+}
+
+/** Pick a day icon from daytime hours so overnight cloud/rain doesn't dominate. */
+function daytimeWeatherCode(codes: number[]): number | null {
+  if (codes.length === 0) return null;
+
+  const wet = codes.filter((code) => code >= 51);
+  if (wet.length > 0) return Math.max(...wet);
+
+  const fog = codes.find((code) => code === 45 || code === 48);
+  if (fog != null) return fog;
+
+  const counts = new Map<number, number>();
+  for (const code of codes) {
+    counts.set(code, (counts.get(code) ?? 0) + 1);
+  }
+
+  let best = codes[0]!;
+  let bestCount = 0;
+  for (const [code, count] of counts) {
+    // Prefer the most common daytime code; break ties toward clearer skies.
+    if (count > bestCount || (count === bestCount && code < best)) {
+      best = code;
+      bestCount = count;
+    }
+  }
+  return best;
 }
 
 function asRecord(value: unknown): Record<string, unknown> | null {

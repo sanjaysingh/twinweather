@@ -10,10 +10,10 @@ const QUICK = [
 ];
 
 const CONDITIONS = {
-  0: "Clear sky",
-  1: "Mainly clear",
-  2: "Partly cloudy",
-  3: "Overcast",
+  0: "Sunny",
+  1: "Mostly sunny",
+  2: "Partly sunny",
+  3: "Cloudy",
   45: "Fog",
   48: "Rime fog",
   51: "Light drizzle",
@@ -347,7 +347,8 @@ function render(place, forecast) {
     setPair("c-high", "f-high", today.maxC);
     const rise = clock(today.sunrise);
     const set = clock(today.sunset);
-    $("sun-times").textContent = `${rise} – ${set}`;
+    $("sunrise-time").textContent = rise;
+    $("sunset-time").textContent = set;
     $("sunline").hidden = false;
     $("sunline").setAttribute("aria-label", `Sunrise ${rise}, sunset ${set}`);
     $("uv").textContent = today.uv == null ? "—" : String(Math.round(today.uv));
@@ -416,10 +417,15 @@ function renderDays(forecast) {
     const sky = document.createElement("span");
     sky.className = "day-sky";
     sky.innerHTML = icon(day.weatherCode, true);
+    if (day.precipProb >= 15) {
+      const pop = document.createElement("span");
+      pop.className = "pop";
+      pop.textContent = `${Math.round(day.precipProb)}%`;
+      sky.append(pop);
+    }
     const note = document.createElement("span");
     note.className = "day-note";
-    const label = CONDITIONS[day.weatherCode] || "Weather";
-    note.textContent = day.precipProb > 0 ? `${label} · ${Math.round(day.precipProb)}%` : label;
+    note.textContent = CONDITIONS[day.weatherCode] || "Weather";
     const low = pair(day.minC);
     const high = pair(day.maxC);
     item.append(name, sky, note, low, high);
@@ -654,8 +660,8 @@ function setStatus(message) {
 }
 
 function icon(code, isDay) {
-  if (code === 0) return isDay ? sun() : moon();
-  if (code === 1 || code === 2) return isDay ? sunCloud() : moonCloud();
+  if (code === 0 || code === 1) return isDay ? sun() : moon();
+  if (code === 2) return isDay ? sunCloud() : moonCloud();
   if (code === 3 || code === 45 || code === 48) return cloud();
   if (code >= 71 && code <= 77) return snow();
   if (code === 85 || code === 86) return snow();

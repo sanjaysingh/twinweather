@@ -1,4 +1,4 @@
-const CACHE = "twinweather-v2";
+const CACHE = "twinweather-v3";
 const SHELL = [
   "/",
   "/styles.css",
