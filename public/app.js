@@ -421,7 +421,7 @@ function renderDays(forecast) {
     note.className = "day-note";
     note.textContent = CONDITIONS[day.weatherCode] || "Weather";
     const temps = rangePair(day.minC, day.maxC);
-    const wind = dayWind(day.windKmh, day.windDeg);
+    const wind = dayWind(day.windMinKmh, day.windMaxKmh, day.windDeg);
     item.append(name, sky, note, temps, wind);
     list.append(item);
   });
@@ -453,7 +453,7 @@ function rangePair(minC, maxC) {
   return node;
 }
 
-function dayWind(kmh, deg) {
+function dayWind(minKmh, maxKmh, deg) {
   const node = document.createElement("span");
   node.className = "day-wind";
   const direction = document.createElement("span");
@@ -463,10 +463,17 @@ function dayWind(kmh, deg) {
   speeds.className = "pair";
   const kilo = document.createElement("span");
   kilo.className = "c";
-  kilo.textContent = typeof kmh === "number" ? `${Math.round(kmh)} km/h` : "—";
   const miles = document.createElement("span");
   miles.className = "f";
-  miles.textContent = typeof kmh === "number" ? `${Math.round(kmh * 0.621371)} mph` : "—";
+  if (typeof minKmh === "number" && typeof maxKmh === "number") {
+    const loK = Math.min(minKmh, maxKmh);
+    const hiK = Math.max(minKmh, maxKmh);
+    kilo.textContent = `${Math.round(loK)}–${Math.round(hiK)} km/h`;
+    miles.textContent = `${Math.round(loK * 0.621371)}–${Math.round(hiK * 0.621371)} mph`;
+  } else {
+    kilo.textContent = "—";
+    miles.textContent = "—";
+  }
   speeds.append(kilo, miles);
   node.append(direction, speeds);
   return node;
@@ -707,7 +714,7 @@ function isUsableForecast(forecast) {
   if (!Array.isArray(forecast.hourly) || !Array.isArray(forecast.daily) || forecast.daily.length === 0) return false;
   const today = forecast.daily[0];
   if (!today || typeof today.minC !== "number" || typeof today.maxC !== "number") return false;
-  if (typeof today.windKmh !== "number" || typeof today.windDeg !== "number") return false;
+  if (typeof today.windMinKmh !== "number" || typeof today.windMaxKmh !== "number" || typeof today.windDeg !== "number") return false;
   if (typeof today.weatherCode !== "number" || typeof today.sunrise !== "string" || typeof today.sunset !== "string") return false;
   return forecast.hourly.every(
     (hour) =>

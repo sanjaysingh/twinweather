@@ -596,7 +596,7 @@ body.is-searching { overflow: hidden; }
 
 .day-head, .day {
   display: grid;
-  grid-template-columns: 4.4rem 2.2rem minmax(4.8rem, 1fr) minmax(4.2rem, 1fr);
+  grid-template-columns: 4.4rem 2.2rem minmax(4.8rem, 1fr) minmax(5.2rem, 1.1fr);
   gap: 0.45rem;
   align-items: center;
 }
@@ -682,7 +682,7 @@ body.is-searching { overflow: hidden; }
 
 @media (min-width: 720px) {
   .facts { grid-template-columns: repeat(4, 1fr); }
-  .day-head, .day { grid-template-columns: 5.2rem 2.2rem minmax(0, 1.3fr) minmax(5.2rem, 1fr) minmax(4.4rem, 1fr); }
+  .day-head, .day { grid-template-columns: 5.2rem 2.2rem minmax(0, 1.3fr) minmax(5.2rem, 1fr) minmax(5.6rem, 1.1fr); }
   .day-note, .day-note-spacer { display: block; }
   .hour { width: 5.6rem; }
 }

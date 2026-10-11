@@ -34,7 +34,8 @@ interface ForecastPayload {
     maxC: number;
     minC: number;
     precipProb: number;
-    windKmh: number;
+    windMinKmh: number;
+    windMaxKmh: number;
     windDeg: number;
     sunrise: string;
     sunset: string;
@@ -173,6 +174,7 @@ async function forecast(url: URL): Promise<Response> {
       "temperature_2m_max",
       "temperature_2m_min",
       "precipitation_probability_max",
+      "wind_speed_10m_min",
       "wind_speed_10m_max",
       "wind_direction_10m_dominant",
       "sunrise",
@@ -265,6 +267,7 @@ function shapeForecast(payload: Record<string, unknown>): ForecastPayload | null
   const maxes = asArray(daily.temperature_2m_max);
   const mins = asArray(daily.temperature_2m_min);
   const probs = asArray(daily.precipitation_probability_max);
+  const windMins = asArray(daily.wind_speed_10m_min);
   const windMaxes = asArray(daily.wind_speed_10m_max);
   const windDirs = asArray(daily.wind_direction_10m_dominant);
   const sunrises = asArray(daily.sunrise);
@@ -276,6 +279,7 @@ function shapeForecast(payload: Record<string, unknown>): ForecastPayload | null
     maxes.length,
     mins.length,
     probs.length,
+    windMins.length,
     windMaxes.length,
     windDirs.length,
     sunrises.length,
@@ -314,7 +318,8 @@ function shapeForecast(payload: Record<string, unknown>): ForecastPayload | null
     const maxC = asNumber(maxes[i]);
     const minC = asNumber(mins[i]);
     const precipProb = asNumber(probs[i]);
-    const windKmh = asNumber(windMaxes[i]);
+    const windMinKmh = asNumber(windMins[i]);
+    const windMaxKmh = asNumber(windMaxes[i]);
     const windDeg = asNumber(windDirs[i]);
     const sunrise = asString(sunrises[i]);
     const sunset = asString(sunsets[i]);
@@ -324,7 +329,8 @@ function shapeForecast(payload: Record<string, unknown>): ForecastPayload | null
       maxC == null ||
       minC == null ||
       precipProb == null ||
-      windKmh == null ||
+      windMinKmh == null ||
+      windMaxKmh == null ||
       windDeg == null ||
       !sunrise ||
       !sunset
@@ -339,7 +345,8 @@ function shapeForecast(payload: Record<string, unknown>): ForecastPayload | null
       minC,
       // A day with sunrise-to-sunset hours must not inherit the overnight chance.
       precipProb: summary?.precipProb ?? precipProb,
-      windKmh,
+      windMinKmh,
+      windMaxKmh,
       windDeg,
       sunrise,
       sunset,
