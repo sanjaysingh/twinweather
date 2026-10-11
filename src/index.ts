@@ -84,7 +84,8 @@ async function geocode(url: URL): Promise<Response> {
 
   const payload = await readJson(upstream, UPSTREAM_HEADERS);
   const results = Array.isArray(payload.results) ? payload.results.flatMap(asPlace) : [];
-  return json({ results }, 200, results.length > 0 ? 86_400 : 60);
+  // Place names are stable. Keep a hit warm for a day, then refresh it in the background.
+  return json({ results }, 200, results.length > 0 ? 86_400 : 60, results.length > 0 ? 86_400 : 0);
 }
 
 async function reverse(url: URL): Promise<Response> {
@@ -131,6 +132,7 @@ async function reverse(url: URL): Promise<Response> {
       },
     },
     200,
+    86_400,
     86_400,
   );
 }
@@ -182,7 +184,9 @@ async function forecast(url: URL): Promise<Response> {
   const payload = await readJson(upstream, UPSTREAM_HEADERS);
   const shaped = shapeForecast(payload);
   if (!shaped) throw new Error("forecast payload missing required fields");
-  return json(shaped, 200, 600);
+  // Fresh for 10 minutes. For the next 30 minutes, serve the previous forecast
+  // immediately and refresh Open-Meteo in the background, including on a 502.
+  return json(shaped, 200, 600, 1800);
 }
 
 function shapeForecast(payload: Record<string, unknown>): ForecastPayload | null {
@@ -361,11 +365,18 @@ function asPlace(value: unknown): GeocodeHit[] {
   ];
 }
 
-function json(data: unknown, status = 200, cacheSeconds = 0): Response {
+function json(data: unknown, status = 200, cacheSeconds = 0, staleSeconds = 0): Response {
+  let cacheControl = "no-store";
+  if (cacheSeconds > 0) {
+    cacheControl = `public, max-age=${cacheSeconds}`;
+    if (staleSeconds > 0) {
+      cacheControl += `, stale-while-revalidate=${staleSeconds}, stale-if-error=${staleSeconds}`;
+    }
+  }
   const headers = new Headers({
     "Content-Type": "application/json; charset=utf-8",
     "X-Content-Type-Options": "nosniff",
-    "Cache-Control": cacheSeconds > 0 ? `public, max-age=${cacheSeconds}` : "no-store",
+    "Cache-Control": cacheControl,
   });
   return new Response(JSON.stringify(data), { status, headers });
 }

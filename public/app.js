@@ -110,6 +110,12 @@ $("locate").addEventListener("click", locate);
 
 boot();
 
+if ("serviceWorker" in navigator) {
+  window.addEventListener("load", () => {
+    navigator.serviceWorker.register("/sw.js").catch(() => {});
+  });
+}
+
 async function boot() {
   const saved = readSaved();
   if (saved) {
