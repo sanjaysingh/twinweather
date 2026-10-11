@@ -596,7 +596,7 @@ body.is-searching { overflow: hidden; }
 
 .day-head, .day {
   display: grid;
-  grid-template-columns: 4.4rem 2.2rem 1fr 1fr;
+  grid-template-columns: 4.4rem 2.2rem minmax(4.8rem, 1fr) minmax(4.2rem, 1fr);
   gap: 0.45rem;
   align-items: center;
 }
@@ -604,7 +604,35 @@ body.is-searching { overflow: hidden; }
 .day-head { padding: 0 0 0.35rem; letter-spacing: 0.12em; text-transform: uppercase; font-size: 0.68rem; }
 .day-note-spacer { display: none; }
 .day-head span:nth-child(n + 4),
-.day .pair { text-align: right; justify-self: end; }
+.day .day-temps,
+.day .day-wind { text-align: right; justify-self: end; }
+
+.day-wind {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.05rem;
+  font-size: 0.98rem;
+  font-weight: 520;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.2;
+}
+
+.day-wind .wind-dir {
+  color: var(--muted);
+  font-size: 0.75rem;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+}
+
+.day-wind .pair {
+  align-items: flex-end;
+  font-size: 0.9rem;
+}
+
+.day-temps {
+  white-space: nowrap;
+}
 
 .days { list-style: none; margin: 0; padding: 0; }
 
@@ -654,7 +682,7 @@ body.is-searching { overflow: hidden; }
 
 @media (min-width: 720px) {
   .facts { grid-template-columns: repeat(4, 1fr); }
-  .day-head, .day { grid-template-columns: 5.2rem 2.2rem minmax(0, 1.3fr) 1fr 1fr; }
+  .day-head, .day { grid-template-columns: 5.2rem 2.2rem minmax(0, 1.3fr) minmax(5.2rem, 1fr) minmax(4.4rem, 1fr); }
   .day-note, .day-note-spacer { display: block; }
   .hour { width: 5.6rem; }
 }
