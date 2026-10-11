@@ -417,7 +417,7 @@ function renderDays(forecast) {
     const sky = document.createElement("span");
     sky.className = "day-sky";
     sky.innerHTML = icon(day.weatherCode, true);
-    if (day.precipProb >= 15) {
+    if (day.precipProb > 0 && (day.weatherCode >= 51 || day.precipProb >= 15)) {
       const pop = document.createElement("span");
       pop.className = "pop";
       pop.textContent = `${Math.round(day.precipProb)}%`;
@@ -675,9 +675,7 @@ function svg(paths) {
 }
 
 function sun() {
-  return svg(
-    `<circle cx="12" cy="12" r="3.2"/><path d="M12 3.5v2.1M12 18.4v2.1M3.5 12h2.1M18.4 12h2.1M6 6l1.5 1.5M16.5 16.5 18 18M18 6l-1.5 1.5M7.5 16.5 6 18"/>`,
-  );
+  return `<svg class="wx wx-sun" viewBox="0 0 24 24" aria-hidden="true"><circle class="wx-sun-core" cx="12" cy="12" r="4"/><circle class="wx-sun-hot" cx="12" cy="12" r="2.05"/><path class="wx-sun-rays" d="M12 3.2v2.2M12 18.6v2.2M3.2 12h2.2M18.6 12h2.2M5.7 5.7l1.6 1.6M16.7 16.7l1.6 1.6M18.3 5.7l-1.6 1.6M7.3 16.7 5.7 18.3"/></svg>`;
 }
 
 function moon() {
@@ -689,9 +687,7 @@ function cloud() {
 }
 
 function sunCloud() {
-  return svg(
-    `<circle cx="8" cy="8" r="2.2"/><path d="M8 3.6v1.2M8 11.2v1.2M3.6 8h1.2M11.2 8h1.2M4.8 4.8l.8.8M10.4 10.4l.8.8M10.4 5.6l-.8.8M5.6 10.4l-.8.8"/><path d="M9.2 18.2h8.2a2.8 2.8 0 0 0 .3-5.6 3.8 3.8 0 0 0-7.2-1.1 2.6 2.6 0 0 0-1.3 6.7z"/>`,
-  );
+  return `<svg class="wx wx-partly" viewBox="0 0 24 24" aria-hidden="true"><g class="wx-sun"><circle class="wx-sun-core" cx="8" cy="8" r="2.25"/><circle class="wx-sun-hot" cx="8" cy="8" r="1.1"/><path class="wx-sun-rays" d="M8 3.35v1.2M8 11.45v1.2M3.35 8h1.2M11.45 8h1.2M4.7 4.7l.85.85M10.45 10.45l.85.85M11.3 4.7l-.85.85M5.55 10.45l-.85.85"/></g><path class="wx-cloud" d="M9.2 18.2h8.2a2.8 2.8 0 0 0 .3-5.6 3.8 3.8 0 0 0-7.2-1.1 2.6 2.6 0 0 0-1.3 6.7z"/></svg>`;
 }
 
 function moonCloud() {

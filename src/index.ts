@@ -162,7 +162,7 @@ async function forecast(url: URL): Promise<Response> {
   );
   upstream.searchParams.set(
     "hourly",
-    ["temperature_2m", "precipitation_probability", "weather_code", "is_day"].join(","),
+    ["temperature_2m", "precipitation", "precipitation_probability", "weather_code", "is_day"].join(","),
   );
   upstream.searchParams.set(
     "daily",
@@ -218,6 +218,7 @@ function shapeForecast(payload: Record<string, unknown>): ForecastPayload | null
 
   const hourlyTimes = asArray(hourly.time);
   const hourlyTemps = asArray(hourly.temperature_2m);
+  const hourlyAmount = asArray(hourly.precipitation);
   const hourlyPrecip = asArray(hourly.precipitation_probability);
   const hourlyCodes = asArray(hourly.weather_code);
   const hourlyDay = asArray(hourly.is_day);
@@ -273,18 +274,29 @@ function shapeForecast(payload: Record<string, unknown>): ForecastPayload | null
     sunsets.length,
   );
 
-  // Open-Meteo daily weather_code is the most severe hour in 24h, so one cloudy
-  // night hour can hide an otherwise sunny day. Prefer daytime hours instead.
-  const daytimeCodes = new Map<string, number[]>();
+  // The day's icon and rain chance use only the hours from sunrise through
+  // the last hour before sunset. Rain before sunrise or after sunset stays
+  // on the hourly row and does not change that day's summary.
+  const sunWindow = new Map<string, { sunrise: string; sunset: string }>();
+  for (let i = 0; i < dayCount; i++) {
+    const date = asString(dates[i]);
+    const sunrise = asString(sunrises[i]);
+    const sunset = asString(sunsets[i]);
+    if (date && sunrise && sunset) sunWindow.set(date, { sunrise, sunset });
+  }
+
+  const daylightHours = new Map<string, SunHour[]>();
   for (let i = 0; i < hourCount; i++) {
     const hourTime = asString(hourlyTimes[i]);
     const hourCode = asNumber(hourlyCodes[i]);
-    const hourDay = asNumber(hourlyDay[i]);
-    if (!hourTime || hourCode == null || hourDay !== 1) continue;
+    const hourProb = asNumber(hourlyPrecip[i]);
+    if (!hourTime || hourCode == null || hourProb == null) continue;
+    if (!inSunWindow(hourTime, sunWindow.get(hourTime.slice(0, 10)))) continue;
     const date = hourTime.slice(0, 10);
-    const list = daytimeCodes.get(date);
-    if (list) list.push(hourCode);
-    else daytimeCodes.set(date, [hourCode]);
+    const sample = { code: hourCode, precipProb: hourProb, precipMm: asNumber(hourlyAmount[i]) ?? 0 };
+    const list = daylightHours.get(date);
+    if (list) list.push(sample);
+    else daylightHours.set(date, [sample]);
   }
 
   const days: ForecastPayload["daily"] = [];
@@ -299,12 +311,14 @@ function shapeForecast(payload: Record<string, unknown>): ForecastPayload | null
     if (!date || code == null || maxC == null || minC == null || precipProb == null || !sunrise || !sunset) {
       continue;
     }
+    const summary = summarizeDaylight(daylightHours.get(date) ?? []);
     days.push({
       date,
-      weatherCode: daytimeWeatherCode(daytimeCodes.get(date) ?? []) ?? code,
+      weatherCode: summary?.weatherCode ?? code,
       maxC,
       minC,
-      precipProb,
+      // A day with sunrise-to-sunset hours must not inherit the overnight chance.
+      precipProb: summary?.precipProb ?? precipProb,
       sunrise,
       sunset,
       uv: asNumber(uvs[i]),
@@ -410,25 +424,82 @@ function coordinate(raw: string | null, min: number, max: number): string | null
   return value.toFixed(2);
 }
 
-/** Pick a day icon from daytime hours so overnight cloud/rain doesn't dominate. */
+/** True when this hour's timestamp falls from sunrise up to, but not including, sunset. */
+function inSunWindow(time: string, window: { sunrise: string; sunset: string } | undefined): boolean {
+  if (!window) return false;
+  return time >= window.sunrise && time < window.sunset;
+}
+
+interface SunHour {
+  code: number;
+  precipProb: number;
+  precipMm: number;
+}
+
+/** Same bar the page uses before it prints a rain chance next to a dry sky. */
+const MENTION_CHANCE = 15;
+
+/**
+ * The day's sky is whatever covers the most hours between sunrise and sunset.
+ * Precipitation replaces that sky when it is the most common condition, or
+ * when its chance is at least 15%. A 2% drizzle hour does not rename a sunny day.
+ */
+function summarizeDaylight(hours: SunHour[]): { weatherCode: number; precipProb: number } | null {
+  if (hours.length === 0) return null;
+
+  const wet = hours.filter((hour) => hour.code >= 51 && hour.precipProb > 0);
+  const sky = hours.filter((hour) => hour.code < 51);
+  const skyCode = daytimeWeatherCode(sky.map((hour) => hour.code));
+  const dayPop = Math.max(...hours.map((hour) => hour.precipProb));
+  const wetSummary = wet.length > 0 ? mainPrecipitation(wet) : null;
+  const wetDominates = wetSummary != null && wet.length > mostCommonCount(sky.map((hour) => hour.code));
+  if (wetSummary && (wetDominates || wetSummary.precipProb >= MENTION_CHANCE)) return wetSummary;
+  if (skyCode == null) return wetSummary ?? { weatherCode: hours[0]!.code, precipProb: dayPop };
+  return { weatherCode: skyCode, precipProb: dayPop };
+}
+
+/** Precipitation type with the most daylight water, and that type's highest chance. */
+function mainPrecipitation(hours: SunHour[]): { weatherCode: number; precipProb: number } {
+  const groups = new Map<number, { mm: number; count: number; pop: number }>();
+  for (const hour of hours) {
+    const group = groups.get(hour.code) ?? { mm: 0, count: 0, pop: 0 };
+    group.mm += Math.max(0, hour.precipMm);
+    group.count += 1;
+    group.pop = Math.max(group.pop, hour.precipProb);
+    groups.set(hour.code, group);
+  }
+
+  const hasWater = [...groups.values()].some((group) => group.mm > 0);
+  let bestCode = hours[0]!.code;
+  let best = groups.get(bestCode)!;
+  for (const [code, group] of groups) {
+    const better = hasWater
+      ? group.mm > best.mm || (group.mm === best.mm && (group.count > best.count || (group.count === best.count && code > bestCode)))
+      : group.pop > best.pop || (group.pop === best.pop && (group.count > best.count || (group.count === best.count && code > bestCode)));
+    if (better) {
+      bestCode = code;
+      best = group;
+    }
+  }
+  return { weatherCode: bestCode, precipProb: best.pop };
+}
+
+function mostCommonCount(codes: number[]): number {
+  const counts = new Map<number, number>();
+  for (const code of codes) counts.set(code, (counts.get(code) ?? 0) + 1);
+  return Math.max(0, ...counts.values());
+}
+
+/** Most common sky code between sunrise and sunset. Ties go to the clearer code. */
 function daytimeWeatherCode(codes: number[]): number | null {
   if (codes.length === 0) return null;
 
-  const wet = codes.filter((code) => code >= 51);
-  if (wet.length > 0) return Math.max(...wet);
-
-  const fog = codes.find((code) => code === 45 || code === 48);
-  if (fog != null) return fog;
-
   const counts = new Map<number, number>();
-  for (const code of codes) {
-    counts.set(code, (counts.get(code) ?? 0) + 1);
-  }
+  for (const code of codes) counts.set(code, (counts.get(code) ?? 0) + 1);
 
   let best = codes[0]!;
   let bestCount = 0;
   for (const [code, count] of counts) {
-    // Prefer the most common daytime code; break ties toward clearer skies.
     if (count > bestCount || (count === bestCount && code < best)) {
       best = code;
       bestCount = count;
