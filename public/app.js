@@ -1,12 +1,10 @@
 "use strict";
 
-const QUICK = [
+const DEFAULT_PLACES = [
   { name: "New York", admin1: "New York", country: "United States", latitude: 40.71, longitude: -74.01 },
   { name: "London", admin1: "England", country: "United Kingdom", latitude: 51.51, longitude: -0.13 },
   { name: "Tokyo", admin1: "Tokyo", country: "Japan", latitude: 35.68, longitude: 139.69 },
-  { name: "Lisbon", admin1: "Lisbon", country: "Portugal", latitude: 38.72, longitude: -9.14 },
-  { name: "Mexico City", admin1: "Mexico City", country: "Mexico", latitude: 19.43, longitude: -99.13 },
-  { name: "Reykjavík", admin1: null, country: "Iceland", latitude: 64.15, longitude: -21.94 },
+  { name: "New Delhi", admin1: "Delhi", country: "India", latitude: 28.62, longitude: 77.21 },
 ];
 
 const CONDITIONS = {
@@ -41,6 +39,8 @@ const CONDITIONS = {
 };
 
 const FORECAST_KEY = "twinweather-forecasts";
+const RECENT_KEY = "twinweather-recent";
+const RECENT_MAX = 8;
 const STALE_MS = 10 * 60 * 1000;
 const FORECAST_TIMEOUT_MS = 20000;
 
@@ -60,18 +60,7 @@ const state = {
 };
 
 const chips = $("chips");
-for (const place of QUICK) {
-  const button = document.createElement("button");
-  button.type = "button";
-  button.className = "chip";
-  button.textContent = place.name;
-  button.setAttribute("aria-pressed", "false");
-  button.addEventListener("click", () => {
-    closeSearch();
-    selectPlace(place);
-  });
-  chips.append(button);
-}
+renderChips();
 
 $("finder").addEventListener("submit", (event) => {
   event.preventDefault();
@@ -131,6 +120,7 @@ if ("serviceWorker" in navigator) {
 async function boot() {
   const saved = readSaved();
   if (saved) {
+    touchRecent(saved);
     await selectPlace(saved, { remember: false });
     return;
   }
@@ -145,7 +135,7 @@ async function boot() {
     locate();
     return;
   }
-  await selectPlace(QUICK[0]);
+  await selectPlace(readRecent()[0]);
 }
 
 async function runSearch(query) {
@@ -279,8 +269,12 @@ async function selectPlace(place, { remember = true } = {}) {
   const alreadyShowing = previousKey === placeKey(next) && state.hasForecast;
   state.locating = false;
   state.place = next;
-  if (remember) localStorage.setItem("twinweather-place", JSON.stringify(state.place));
-  markChip(state.place);
+  if (remember) {
+    localStorage.setItem("twinweather-place", JSON.stringify(state.place));
+    touchRecent(state.place);
+  } else {
+    markChip(state.place);
+  }
 
   // Keep the last reading on screen, then ask for a new one. The page stays usable.
   const cached = readCachedForecast(next);
@@ -521,15 +515,65 @@ function skyFor(code, isDay) {
 }
 
 function markChip(place) {
-  const buttons = chips.querySelectorAll(".chip");
-  buttons.forEach((button, index) => {
-    const quick = QUICK[index];
-    const selected =
-      quick.name === place.name &&
-      Math.abs(quick.latitude - place.latitude) < 0.2 &&
-      Math.abs(quick.longitude - place.longitude) < 0.2;
-    button.setAttribute("aria-pressed", selected ? "true" : "false");
+  const key = placeKey(place);
+  chips.querySelectorAll(".chip").forEach((button) => {
+    button.setAttribute("aria-pressed", button.dataset.key === key ? "true" : "false");
   });
+}
+
+function isRememberablePlace(place) {
+  return Boolean(place && typeof place.name === "string" && place.name && place.name !== "Current location");
+}
+
+function readRecent() {
+  try {
+    const raw = localStorage.getItem(RECENT_KEY);
+    if (!raw) return DEFAULT_PLACES.map((place) => normalizePlace(place));
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return DEFAULT_PLACES.map((place) => normalizePlace(place));
+    const places = parsed
+      .filter(isRememberablePlace)
+      .map((place) => normalizePlace(place))
+      .filter((place) => Number.isFinite(place.latitude) && Number.isFinite(place.longitude));
+    return places.length > 0 ? places.slice(0, RECENT_MAX) : DEFAULT_PLACES.map((place) => normalizePlace(place));
+  } catch {
+    return DEFAULT_PLACES.map((place) => normalizePlace(place));
+  }
+}
+
+function touchRecent(place) {
+  if (!isRememberablePlace(place)) {
+    markChip(place);
+    return;
+  }
+  const next = normalizePlace(place);
+  const rest = readRecent().filter((entry) => placeKey(entry) !== placeKey(next));
+  const list = [next, ...rest].slice(0, RECENT_MAX);
+  try {
+    localStorage.setItem(RECENT_KEY, JSON.stringify(list));
+  } catch {
+    // A blocked or full store should not hide the forecast already on screen.
+  }
+  renderChips();
+  markChip(next);
+}
+
+function renderChips() {
+  const places = readRecent();
+  chips.replaceChildren();
+  for (const place of places) {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "chip";
+    button.textContent = place.name;
+    button.dataset.key = placeKey(place);
+    button.setAttribute("aria-pressed", "false");
+    button.addEventListener("click", () => {
+      closeSearch();
+      selectPlace(place);
+    });
+    chips.append(button);
+  }
 }
 
 function readSaved() {
