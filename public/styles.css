@@ -164,28 +164,13 @@ body::before {
 }
 
 .sun-mark {
-  width: 16px;
-  height: 16px;
+  width: 13px;
+  height: 13px;
   flex: none;
-  color: #ffd34d;
   fill: none;
   stroke: currentColor;
   stroke-width: 1.6;
   stroke-linecap: round;
-}
-
-.icon-sun .rays {
-  fill: none;
-  stroke: #ffd34d;
-  stroke-width: 1.7;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-}
-
-.icon-sun .disc {
-  fill: #ffd34d;
-  stroke: #e8a820;
-  stroke-width: 1.15;
 }
 
 .actions { display: flex; gap: 0.4rem; }
@@ -617,7 +602,6 @@ body.is-searching { overflow: hidden; }
 @media (max-width: 420px) {
   .when time { font-size: 0.84rem; }
   .sunline { font-size: 0.68rem; }
-  .sun-mark { width: 14px; height: 14px; }
 }
 
 @media (max-width: 380px) {

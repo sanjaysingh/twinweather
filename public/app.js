@@ -669,7 +669,9 @@ function svg(paths) {
 }
 
 function sun() {
-  return `<svg viewBox="0 0 24 24" class="icon-sun" aria-hidden="true"><path class="rays" fill="none" stroke="#ffd34d" stroke-width="1.7" stroke-linecap="round" d="M12 3.5v2.1M12 18.4v2.1M3.5 12h2.1M18.4 12h2.1M6 6l1.5 1.5M16.5 16.5 18 18M18 6l-1.5 1.5M7.5 16.5 6 18"/><circle class="disc" cx="12" cy="12" r="3.5" fill="#ffd34d" stroke="#e8a820" stroke-width="1.15"/></svg>`;
+  return svg(
+    `<circle cx="12" cy="12" r="3.2"/><path d="M12 3.5v2.1M12 18.4v2.1M3.5 12h2.1M18.4 12h2.1M6 6l1.5 1.5M16.5 16.5 18 18M18 6l-1.5 1.5M7.5 16.5 6 18"/>`,
+  );
 }
 
 function moon() {
@@ -681,7 +683,9 @@ function cloud() {
 }
 
 function sunCloud() {
-  return `<svg viewBox="0 0 24 24" class="icon-sun" aria-hidden="true"><path class="rays" fill="none" stroke="#ffd34d" stroke-width="1.6" stroke-linecap="round" d="M8 3.6v1.2M8 11.2v1.2M3.6 8h1.2M11.2 8h1.2M4.8 4.8l.8.8M10.4 10.4l.8.8M10.4 5.6l-.8.8M5.6 10.4l-.8.8"/><circle class="disc" cx="8" cy="8" r="2.2" fill="#ffd34d" stroke="#e8a820" stroke-width="1.05"/><path fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" d="M9.2 18.2h8.2a2.8 2.8 0 0 0 .3-5.6 3.8 3.8 0 0 0-7.2-1.1 2.6 2.6 0 0 0-1.3 6.7z"/></svg>`;
+  return svg(
+    `<circle cx="8" cy="8" r="2.2"/><path d="M8 3.6v1.2M8 11.2v1.2M3.6 8h1.2M11.2 8h1.2M4.8 4.8l.8.8M10.4 10.4l.8.8M10.4 5.6l-.8.8M5.6 10.4l-.8.8"/><path d="M9.2 18.2h8.2a2.8 2.8 0 0 0 .3-5.6 3.8 3.8 0 0 0-7.2-1.1 2.6 2.6 0 0 0-1.3 6.7z"/>`,
+  );
 }
 
 function moonCloud() {
