@@ -174,15 +174,25 @@ body::before {
 }
 
 .sun-mark {
-  width: 14px;
-  height: 14px;
+  width: 30px;
+  height: 21px;
   flex: none;
   fill: none;
   stroke: currentColor;
   stroke-width: 1.6;
   stroke-linecap: round;
   stroke-linejoin: round;
+  overflow: visible;
 }
+
+.sun-mark .sun-horizon {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.7;
+  stroke-linecap: round;
+}
+
+.sun-mark .wx-sun-rays { stroke-width: 1.7; }
 
 .actions { display: flex; gap: 0.4rem; }
 
@@ -373,6 +383,24 @@ body.is-searching { overflow: hidden; }
 
 .condition-icon { display: inline-flex; color: var(--paper); }
 .condition-icon svg { width: 22px; height: 22px; display: block; }
+
+.wx-sun { color: #f6c15a; }
+.wx-sun-core { fill: currentColor; stroke: none; }
+.wx-sun-hot { fill: #fff6d8; stroke: none; }
+.wx-sun-rays {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+}
+.wx-partly .wx-sun-rays { stroke-width: 1.45; }
+.wx-partly .wx-cloud {
+  fill: color-mix(in srgb, var(--paper) 16%, var(--wash));
+  stroke: color-mix(in srgb, var(--paper) 88%, transparent);
+  stroke-width: 1.6;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
 
 .place-name {
   margin: 0;

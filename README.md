@@ -10,6 +10,31 @@ Search opens over the page and closes after a place is chosen. On a later visit 
 
 On a phone, Twinweather can be added to the home screen and opened like an app.
 
+## How the weather is chosen
+
+Open-Meteo sends an hour-by-hour forecast. The page reads that forecast three ways.
+
+**Right now.** The condition at the top is the current observation. The rain chance next to humidity and wind is the chance for the current hour, and it is always shown.
+
+**Next 24 hours.** Each cell is that hour on its own. Night hours stay in this row. A cell prints a chance only when that hour is at least 15%.
+
+**Each of the next seven days.** The icon, the word, and the chance describe the hours from sunrise up to sunset. An hour counts when its timestamp is at or after sunrise and before sunset. Rain before sunrise or after sunset stays on the hourly row and does not change the day.
+
+Within those hours, the day is the sky that covers the most hours. Sunny, mostly sunny, partly sunny, cloudy, and fog compete the same way. A tie goes to the clearer sky.
+
+Precipitation replaces that sky in two cases:
+
+- Wet hours, taken together, outnumber the most common dry sky. A tie stays with the sky.
+- Or the chance of the main precipitation type is at least 15%.
+
+A wet hour at 0% does not count. One 2% drizzle hour does not rename a sunny day. A day that is mostly drizzle still says drizzle, and the chance is shown even when it is under 15%.
+
+When precipitation wins, the word is the type with the most daylight water, such as light drizzle, drizzle, or dense drizzle. If two types bring the same amount, the one that lasts more hours wins, and a remaining tie goes to the heavier type. The chance is the highest chance among hours of that same type, so a brief 40% shower is not paired with a heavier type from another hour. If none of those hours has measurable water, the type with the highest chance is used.
+
+When the sky wins, the chance is the highest chance of any daylight hour. It is printed only at 15% or above, including next to a sunny or cloudy label.
+
+If the forecast has no hours inside sunrise and sunset, the day falls back to Open-Meteo's own full-day summary.
+
 ## How it is hosted
 
 The pages are static files on GitHub Pages. `https://twinweather.sanjaysingh.net/api/*` is a Cloudflare Worker on the same hostname.
