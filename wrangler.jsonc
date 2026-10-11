@@ -3,6 +3,7 @@
   "name": "twinweather",
   "account_id": "762ce683f0c51592bb1480f5fd3e7b7e",
   "main": "src/index.ts",
+  "workers_dev": false,
   "routes": [
     {
       "pattern": "twinweather.sanjaysingh.net/api/*",
