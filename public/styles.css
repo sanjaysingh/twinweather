@@ -382,13 +382,19 @@ body.is-searching { overflow: hidden; }
 }
 
 .now .condition {
+  flex-direction: column;
+  align-items: flex-start;
   align-self: flex-start;
-  margin: 0 0 0.55rem;
+  gap: 0.28rem;
+  max-width: 42%;
+  margin: 0 0 0.35rem;
   text-align: left;
+  line-height: 1.25;
 }
 
 .condition-icon { display: inline-flex; color: var(--paper); }
 .condition-icon svg { width: 22px; height: 22px; display: block; }
+.now .condition-icon svg { width: 26px; height: 26px; }
 
 .wx-sun { color: #f6c15a; }
 .wx-sun-core { fill: currentColor; stroke: none; }
