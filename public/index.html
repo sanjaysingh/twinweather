@@ -22,10 +22,11 @@
     <link rel="stylesheet" href="/styles.css" />
   </head>
   <body data-sky="idle">
-    <div class="progress" id="progress" hidden>
-      <span></span>
-    </div>
     <div class="shell">
+      <div class="progress" id="progress" role="status" hidden>
+        <p class="progress-label" id="progress-label">Refreshing weather…</p>
+        <div class="progress-bar" aria-hidden="true"><span></span></div>
+      </div>
       <p class="status" id="status" role="status"></p>
 
       <main id="weather" aria-live="polite">
@@ -157,6 +158,6 @@
         <div class="chips" id="chips" role="list"></div>
       </div>
     </div>
-    <script src="/app.js" type="module"></script>
+    <script src="/app.js"></script>
   </body>
 </html>

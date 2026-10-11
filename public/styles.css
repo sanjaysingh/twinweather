@@ -77,17 +77,37 @@ body::before {
 }
 
 .progress {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 2px;
-  z-index: 5;
-  overflow: hidden;
-  background: transparent;
+  position: sticky;
+  z-index: 15;
+  top: env(safe-area-inset-top, 0px);
+  margin: 0 calc(-1 * max(1.15rem, env(safe-area-inset-right))) 0.85rem calc(-1 * max(1.15rem, env(safe-area-inset-left)));
+  padding: 0.15rem max(1.15rem, env(safe-area-inset-right)) 0 max(1.15rem, env(safe-area-inset-left));
+  pointer-events: none;
+  background: color-mix(in srgb, var(--wash) 88%, transparent);
+  backdrop-filter: blur(8px);
 }
 
-.progress span {
+.progress-label {
+  display: inline-block;
+  margin: 0 0 0.45rem;
+  padding: 0.24rem 0.7rem;
+  border-radius: 999px;
+  background: rgba(12, 10, 8, 0.78);
+  color: var(--paper);
+  font-size: 0.8rem;
+  line-height: 1.2;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+}
+
+.progress-bar {
+  height: 3px;
+  margin: 0 calc(-1 * max(1.15rem, env(safe-area-inset-right))) 0 calc(-1 * max(1.15rem, env(safe-area-inset-left)));
+  overflow: hidden;
+  background: rgba(246, 241, 232, 0.16);
+}
+
+.progress-bar > span {
   display: block;
   height: 100%;
   width: 40%;
@@ -595,5 +615,10 @@ body.is-searching { overflow: hidden; }
   *, *::before, *::after {
     animation: none !important;
     transition: none !important;
+  }
+
+  .progress-bar > span {
+    width: 100%;
+    transform: none;
   }
 }
