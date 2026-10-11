@@ -33,10 +33,6 @@
         <section class="stage">
           <div class="place">
             <div class="condition-row">
-              <p class="condition" id="condition">
-                <span class="condition-icon" id="condition-icon"></span>
-                <span id="condition-label">Waiting on the sky</span>
-              </p>
               <div class="actions">
                 <button class="icon-btn" id="open-search" type="button" aria-label="Search for a city" aria-expanded="false" aria-controls="overlay">
                   <svg viewBox="0 0 24 24" aria-hidden="true">
@@ -95,7 +91,11 @@
             </div>
           </div>
 
-          <section class="now" aria-label="Current temperature">
+          <section class="now" aria-label="Current conditions">
+            <p class="condition" id="condition">
+              <span class="condition-icon" id="condition-icon"></span>
+              <span id="condition-label">Waiting on the sky</span>
+            </p>
             <p class="now-reading">
               <span class="now-c"><span class="num" id="c-now">—</span><span class="unit">°C</span></span>
               <span class="pipe" aria-hidden="true">|</span>

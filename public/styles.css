@@ -123,7 +123,7 @@ body::before {
 .condition-row {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-end;
   gap: 0.75rem;
   margin-bottom: 0.35rem;
 }
@@ -373,12 +373,18 @@ body.is-searching { overflow: hidden; }
 .condition {
   display: flex;
   align-items: center;
-  gap: 0.55rem;
+  gap: 0.45rem;
   margin: 0;
   color: var(--muted);
   letter-spacing: 0.08em;
   text-transform: uppercase;
   font-size: 0.78rem;
+}
+
+.now .condition {
+  align-self: flex-start;
+  margin: 0 0 0.55rem;
+  text-align: left;
 }
 
 .condition-icon { display: inline-flex; color: var(--paper); }
@@ -419,8 +425,11 @@ body.is-searching { overflow: hidden; }
 }
 
 .now {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
   min-width: 0;
-  padding: 1.15rem 0.85rem 1rem;
+  padding: 0.85rem 0.85rem 1rem;
   border: 1px solid var(--line);
   border-radius: 28px;
   background:
