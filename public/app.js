@@ -306,8 +306,8 @@ async function selectPlace(place, { remember = true } = {}) {
   const timer = window.setTimeout(() => abort.abort(), FORECAST_TIMEOUT_MS);
   try {
     const response = await fetch(
-      `/api/forecast?latitude=${state.place.latitude.toFixed(2)}&longitude=${state.place.longitude.toFixed(2)}`,
-      { signal: abort.signal, cache: "no-cache" },
+      `/api/forecast?latitude=${state.place.latitude.toFixed(2)}&longitude=${state.place.longitude.toFixed(2)}&_=${Date.now()}`,
+      { signal: abort.signal, cache: "no-store" },
     );
     const payload = await response.json();
     if (refreshId !== state.refreshId) return;

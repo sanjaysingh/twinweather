@@ -184,9 +184,9 @@ async function forecast(url: URL): Promise<Response> {
   const payload = await readJson(upstream, UPSTREAM_HEADERS);
   const shaped = shapeForecast(payload);
   if (!shaped) throw new Error("forecast payload missing required fields");
-  // Fresh for 10 minutes. For the next 30 minutes, serve the previous forecast
-  // immediately and refresh Open-Meteo in the background, including on a 502.
-  return json(shaped, 200, 600, 1800);
+  // User actions (open / locate / search) bust the URL; keep the edge from
+  // holding a shared forecast that can outlive the weather outside.
+  return json(shaped, 200);
 }
 
 function shapeForecast(payload: Record<string, unknown>): ForecastPayload | null {
@@ -327,6 +327,11 @@ function shapeForecast(payload: Record<string, unknown>): ForecastPayload | null
 
   if (hours.length === 0 || days.length === 0) return null;
 
+  // Instantaneous current weather_code can lag a rainy hour (e.g. drizzle
+  // while the current hour is rain). Prefer the wetter of the two.
+  const hourCode = hours[0]?.weatherCode ?? null;
+  const displayCode = preferCurrentWeatherCode(weatherCode, hourCode, precipitation);
+
   return {
     timezone: asString(payload.timezone) || "UTC",
     current: {
@@ -335,7 +340,7 @@ function shapeForecast(payload: Record<string, unknown>): ForecastPayload | null
       apparentC,
       humidity,
       precipitation,
-      weatherCode,
+      weatherCode: displayCode,
       isDay: current.is_day === 1,
       windKmh,
       windDeg,
@@ -488,6 +493,19 @@ function mostCommonCount(codes: number[]): number {
   const counts = new Map<number, number>();
   for (const code of codes) counts.set(code, (counts.get(code) ?? 0) + 1);
   return Math.max(0, ...counts.values());
+}
+
+function isPrecipCode(code: number): boolean {
+  return (code >= 51 && code <= 67) || (code >= 80 && code <= 82) || code >= 95;
+}
+
+/** Prefer a rainy hourly code when instantaneous current understates wet weather. */
+function preferCurrentWeatherCode(current: number, hour: number | null, precipitation: number): number {
+  if (hour != null && isPrecipCode(hour) && (!isPrecipCode(current) || hour > current)) {
+    return hour;
+  }
+  if (precipitation > 0 && !isPrecipCode(current)) return 51;
+  return current;
 }
 
 /** Most common sky code between sunrise and sunset. Ties go to the clearer code. */
