@@ -382,14 +382,18 @@ body.is-searching { overflow: hidden; }
 }
 
 .now .condition {
+  position: absolute;
+  top: 0.85rem;
+  left: 0.85rem;
+  z-index: 1;
   flex-direction: column;
   align-items: flex-start;
-  align-self: flex-start;
   gap: 0.28rem;
-  max-width: 42%;
-  margin: 0 0 0.35rem;
+  max-width: min(42%, 8.5rem);
+  margin: 0;
   text-align: left;
   line-height: 1.25;
+  pointer-events: none;
 }
 
 .condition-icon { display: inline-flex; color: var(--paper); }
@@ -431,11 +435,9 @@ body.is-searching { overflow: hidden; }
 }
 
 .now {
-  display: flex;
-  flex-direction: column;
-  align-items: stretch;
+  position: relative;
   min-width: 0;
-  padding: 0.85rem 0.85rem 1rem;
+  padding: 1.15rem 0.85rem 1rem;
   border: 1px solid var(--line);
   border-radius: 28px;
   background:
@@ -664,6 +666,7 @@ body.is-searching { overflow: hidden; }
     align-items: end;
   }
   .now { padding: 1.4rem 1rem 1.2rem; }
+  .now .condition { top: 1rem; left: 1rem; }
 }
 
 @media (max-width: 420px) {
