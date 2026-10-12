@@ -236,17 +236,8 @@ function shapeForecast(payload: Record<string, unknown>): ForecastPayload | null
     hourlyDay.length,
   );
   const currentHour = time.slice(0, 13);
-  let start = 0;
-  for (let i = 0; i < hourCount; i++) {
-    const hourTime = asString(hourlyTimes[i]);
-    if (hourTime && hourTime.slice(0, 13) >= currentHour) {
-      start = i;
-      break;
-    }
-  }
-
   const hours: ForecastPayload["hourly"] = [];
-  for (let i = start; i < hourCount && hours.length < 24; i++) {
+  for (let i = 0; i < hourCount; i++) {
     const hourTime = asString(hourlyTimes[i]);
     const hourTemp = asNumber(hourlyTemps[i]);
     const hourProb = asNumber(hourlyPrecip[i]);
@@ -358,7 +349,8 @@ function shapeForecast(payload: Record<string, unknown>): ForecastPayload | null
 
   // Instantaneous current weather_code can lag a rainy hour (e.g. drizzle
   // while the current hour is rain). Prefer the wetter of the two.
-  const hourCode = hours[0]?.weatherCode ?? null;
+  const currentSlot = hours.find((hour) => hour.time.slice(0, 13) >= currentHour) ?? hours[0];
+  const hourCode = currentSlot?.weatherCode ?? null;
   const displayCode = preferCurrentWeatherCode(weatherCode, hourCode, precipitation);
 
   return {

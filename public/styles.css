@@ -222,10 +222,19 @@ body::before {
 }
 
 .when time {
-  display: block;
+  display: flex;
+  align-items: baseline;
+  justify-content: flex-end;
+  gap: 0.55rem;
   font-size: 0.95rem;
   font-variant-numeric: tabular-nums;
   line-height: 1.1;
+}
+
+.local-date {
+  color: var(--muted);
+  font-size: 0.78rem;
+  letter-spacing: 0.14em;
 }
 
 .sunline[hidden] { display: none; }
@@ -627,11 +636,21 @@ body.is-searching { overflow: hidden; }
 }
 
 .panel-head h2 {
+  display: flex;
+  align-items: baseline;
+  gap: 0.7rem;
   margin: 0;
   font-size: 0.78rem;
   font-weight: 520;
   letter-spacing: 0.16em;
   text-transform: uppercase;
+}
+
+.hours-date {
+  color: var(--muted);
+  font-size: 0.85rem;
+  letter-spacing: 0.04em;
+  text-transform: none;
 }
 
 .day-head { color: var(--faint); font-size: 0.82rem; }
@@ -655,7 +674,34 @@ body.is-searching { overflow: hidden; }
   border-right: 1px solid var(--line);
 }
 
+.hour.is-past { opacity: 0.42; }
 .hour.is-now { background: rgba(246, 241, 232, 0.05); }
+
+.hour-stem {
+  display: flex;
+  align-items: flex-end;
+  width: 6px;
+  height: 2.6rem;
+  margin: 0.45rem auto 0.2rem;
+  border-radius: 999px;
+  background: rgba(246, 241, 232, 0.1);
+  overflow: hidden;
+}
+
+.hour-stem > span {
+  display: block;
+  width: 100%;
+  height: calc(16% + var(--level) * 84%);
+  border-radius: inherit;
+  background: linear-gradient(to top, var(--celsius), var(--fahrenheit));
+}
+
+.hours-empty {
+  margin: 0;
+  padding: 1.1rem 0.2rem;
+  color: var(--muted);
+  font-size: 0.92rem;
+}
 
 .hour time, .hour .pop {
   display: block;
@@ -719,10 +765,28 @@ body.is-searching { overflow: hidden; }
 }
 
 .days { list-style: none; margin: 0; padding: 0; }
+.days > li { margin: 0; }
 
 .day {
-  padding: 0.72rem 0;
+  width: 100%;
+  margin: 0;
+  padding: 0.72rem 0.35rem;
+  border: 0;
   border-top: 1px solid var(--line);
+  border-radius: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: inherit;
+  cursor: pointer;
+}
+
+.day:hover,
+.day[aria-pressed="true"] { background: rgba(246, 241, 232, 0.06); }
+
+.day:focus-visible {
+  outline: none;
+  box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--celsius) 70%, var(--fahrenheit));
 }
 
 .day-name { font-size: 0.95rem; }
