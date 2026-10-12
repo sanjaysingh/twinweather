@@ -330,7 +330,7 @@ function render(place, forecast) {
   document.body.dataset.sky = sky;
   syncPrecip(forecast.current.weatherCode);
   $("condition-icon").innerHTML = icon(forecast.current.weatherCode, forecast.current.isDay);
-  $("condition-label").textContent = CONDITIONS[forecast.current.weatherCode] || "Weather";
+  $("condition-label").textContent = conditionName(forecast.current.weatherCode, forecast.current.isDay);
   $("place-name").textContent = place.name;
   $("place-region").textContent = [place.admin1, place.country].filter(Boolean).join(" · ");
   startClock(forecast.timezone);
@@ -541,6 +541,13 @@ function startClock(timeZone) {
 function compass(degrees) {
   const names = ["N", "NE", "E", "SE", "S", "SW", "W", "NW"];
   return names[Math.round(degrees / 45) % 8];
+}
+
+function conditionName(code, isDay) {
+  if (!isDay && code === 0) return "Clear";
+  if (!isDay && code === 1) return "Mostly clear";
+  if (!isDay && code === 2) return "Partly cloudy";
+  return CONDITIONS[code] || "Weather";
 }
 
 function skyFor(code, isDay) {
