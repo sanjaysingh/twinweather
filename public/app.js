@@ -57,6 +57,9 @@ const state = {
   refreshing: false,
   locating: false,
   hasForecast: false,
+  forecast: null,
+  selectedDay: null,
+  hourPlace: "",
 };
 
 const chips = $("chips");
@@ -325,6 +328,15 @@ async function selectPlace(place, { remember = true } = {}) {
 }
 
 function render(place, forecast) {
+  const key = placeKey(place);
+  if (key !== state.hourPlace) {
+    state.selectedDay = null;
+    state.hourPlace = key;
+  }
+  state.forecast = forecast;
+  if (state.selectedDay && !forecast.daily.some((day) => day.date === state.selectedDay)) {
+    state.selectedDay = null;
+  }
   const today = forecast.daily[0];
   const sky = skyFor(forecast.current.weatherCode, forecast.current.isDay);
   document.body.dataset.sky = sky;
@@ -365,7 +377,8 @@ function render(place, forecast) {
   speeds.append(kilo, miles);
   $("wind").append(direction, speeds);
 
-  const currentHour = forecast.hourly[0];
+  const nowKey = forecast.current.time.slice(0, 13);
+  const currentHour = forecast.hourly.find((hour) => hour.time.slice(0, 13) >= nowKey) ?? forecast.hourly[0];
   $("rain").textContent = currentHour ? `${Math.round(currentHour.precipProb)}%` : "—";
 
   renderHours(forecast);
@@ -376,19 +389,59 @@ function render(place, forecast) {
   state.hasForecast = true;
 }
 
-function renderHours(forecast) {
+function renderHours(forecast, { reveal = false } = {}) {
   const row = $("hours");
+  const selected = state.selectedDay;
+  const nowKey = forecast.current.time.slice(0, 13);
+  const hours = selected
+    ? forecast.hourly.filter((hour) => hour.time.slice(0, 10) === selected)
+    : forecast.hourly.filter((hour) => hour.time.slice(0, 13) >= nowKey).slice(0, 24);
+  const title = $("hours-title");
+  title.replaceChildren();
+  const label = document.createElement("span");
+  label.textContent = selected ? dayTitle(forecast, selected) : "Next 24 hours";
+  title.append(label);
+  if (selected) {
+    const stamp = document.createElement("span");
+    stamp.className = "hours-date";
+    stamp.textContent = dayStamp(selected);
+    title.append(stamp);
+  }
+
   row.replaceChildren();
-  const nowHour = forecast.current.time.slice(0, 13);
-  for (const hour of forecast.hourly) {
+  row.scrollLeft = 0;
+  if (hours.length === 0) {
+    const empty = document.createElement("p");
+    empty.className = "hours-empty";
+    empty.textContent = "Hours for this day aren't loaded yet.";
+    row.append(empty);
+    if (reveal) revealHours();
+    return;
+  }
+
+  const temps = hours.map((hour) => hour.temperatureC);
+  const low = Math.min(...temps);
+  const high = Math.max(...temps);
+  const span = Math.max(high - low, 0.5);
+  const day = selected ? forecast.daily.find((item) => item.date === selected) : null;
+  const focusTime = focusHourTime(hours, day, nowKey);
+  for (const hour of hours) {
+    const key = hour.time.slice(0, 13);
     const cell = document.createElement("article");
-    cell.className = hour.time.slice(0, 13) === nowHour ? "hour is-now" : "hour";
+    cell.className = "hour";
+    cell.dataset.hour = hour.time;
+    if (key === nowKey) cell.classList.add("is-now");
+    else if (selected && key < nowKey) cell.classList.add("is-past");
     const time = document.createElement("time");
     time.dateTime = hour.time;
-    time.textContent = hour.time.slice(0, 13) === nowHour ? "Now" : clock(hour.time);
+    time.textContent = key === nowKey ? "Now" : clock(hour.time);
     const sky = document.createElement("span");
     sky.innerHTML = icon(hour.weatherCode, hour.isDay);
-    cell.append(time, sky, pair(hour.temperatureC));
+    const stem = document.createElement("span");
+    stem.className = "hour-stem";
+    stem.style.setProperty("--level", ((hour.temperatureC - low) / span).toFixed(3));
+    stem.append(document.createElement("span"));
+    cell.append(time, sky, stem, pair(hour.temperatureC));
     if (hour.precipProb >= 15) {
       const pop = document.createElement("span");
       pop.className = "pop";
@@ -397,6 +450,50 @@ function renderHours(forecast) {
     }
     row.append(cell);
   }
+  const focus = focusTime ? row.querySelector(`[data-hour="${focusTime}"]`) : null;
+  if (focus) row.scrollLeft = Math.max(0, focus.offsetLeft - 8);
+  if (reveal) revealHours();
+}
+
+function revealHours() {
+  const behavior = window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth";
+  $("hours-panel").scrollIntoView({ behavior, block: "start" });
+}
+
+function chooseDay(date) {
+  if (!state.forecast) return;
+  state.selectedDay = state.selectedDay === date ? null : date;
+  document.querySelectorAll("#days .day").forEach((button) => {
+    button.setAttribute("aria-pressed", button.dataset.date === state.selectedDay ? "true" : "false");
+  });
+  renderHours(state.forecast, { reveal: true });
+}
+
+function dayTitle(forecast, date) {
+  const todayKey = localDate(forecast.timezone);
+  const index = forecast.daily.findIndex((day) => day.date === date);
+  if (date === todayKey || index === 0) return "Today";
+  if (index === 1) return "Tomorrow";
+  return new Intl.DateTimeFormat("en-US", { weekday: "long", timeZone: "UTC" }).format(new Date(`${date}T12:00:00Z`));
+}
+
+function dayStamp(date) {
+  return new Intl.DateTimeFormat("en-US", {
+    month: "short",
+    day: "numeric",
+    timeZone: "UTC",
+  }).format(new Date(`${date}T12:00:00Z`));
+}
+
+function focusHourTime(hours, day, nowKey) {
+  const now = hours.find((hour) => hour.time.slice(0, 13) === nowKey);
+  if (now) return now.time;
+  if (day?.sunrise) {
+    const rise = day.sunrise.slice(0, 13);
+    const after = hours.find((hour) => hour.time.slice(0, 13) >= rise);
+    if (after) return after.time;
+  }
+  return hours[Math.min(8, hours.length - 1)]?.time ?? null;
 }
 
 function renderDays(forecast) {
@@ -405,7 +502,12 @@ function renderDays(forecast) {
   const todayKey = localDate(forecast.timezone);
   forecast.daily.forEach((day, index) => {
     const item = document.createElement("li");
-    item.className = "day";
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "day";
+    button.dataset.date = day.date;
+    button.setAttribute("aria-pressed", state.selectedDay === day.date ? "true" : "false");
+    button.addEventListener("click", () => chooseDay(day.date));
     const name = document.createElement("span");
     name.className = "day-name";
     name.textContent = index === 0 || day.date === todayKey ? "Today" : index === 1 ? "Tomorrow" : weekday(day.date);
@@ -423,7 +525,8 @@ function renderDays(forecast) {
     note.textContent = CONDITIONS[day.weatherCode] || "Weather";
     const temps = rangePair(day.minC, day.maxC);
     const wind = dayWind(day.windMinKmh, day.windMaxKmh, day.windDeg);
-    item.append(name, sky, note, temps, wind);
+    button.append(name, sky, note, temps, wind);
+    item.append(button);
     list.append(item);
   });
 }
@@ -524,15 +627,28 @@ function localDate(timeZone) {
   }).format(new Date());
 }
 
+function placeDateLabel(timeZone) {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone,
+    month: "short",
+    day: "numeric",
+  }).formatToParts(new Date());
+  const month = parts.find((part) => part.type === "month")?.value ?? "";
+  const day = parts.find((part) => part.type === "day")?.value ?? "";
+  return `${month} ${day}`.toUpperCase();
+}
+
 function startClock(timeZone) {
   window.clearInterval(state.clock);
   const tick = () => {
-    $("local-time").textContent = new Intl.DateTimeFormat("en-US", {
+    const now = new Date();
+    $("local-clock").textContent = new Intl.DateTimeFormat("en-US", {
       timeZone,
       hour: "numeric",
       minute: "2-digit",
-    }).format(new Date());
-    $("local-time").dateTime = new Date().toISOString();
+    }).format(now);
+    $("local-date").textContent = placeDateLabel(timeZone);
+    $("local-time").dateTime = now.toISOString();
   };
   tick();
   state.clock = window.setInterval(tick, 30000);
