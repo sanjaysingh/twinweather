@@ -59,6 +59,7 @@ body[data-sky="storm"] { --wash: #130e18; --glow: #b06adf; --glow-2: #e08a55; }
 body::before {
   content: "";
   position: fixed;
+  z-index: 4;
   inset: 0;
   pointer-events: none;
   opacity: 0.18;
@@ -66,7 +67,85 @@ body::before {
   mix-blend-mode: overlay;
 }
 
+.precip {
+  position: fixed;
+  z-index: 3;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.precip > span {
+  position: absolute;
+  top: -12%;
+  display: block;
+  pointer-events: none;
+}
+
+.precip[data-kind="rain"] > span,
+.precip[data-kind="storm"] > span {
+  width: 1px;
+  border-radius: 999px;
+  background: linear-gradient(to bottom, transparent, rgba(215, 228, 234, 0.12) 18%, rgba(215, 228, 234, 0.82));
+  animation-name: rain-fall;
+  animation-timing-function: linear;
+  animation-iteration-count: infinite;
+}
+
+.precip[data-kind="storm"] > span {
+  background: linear-gradient(to bottom, transparent, rgba(232, 220, 246, 0.16) 18%, rgba(236, 228, 246, 0.78));
+}
+
+.precip[data-kind="rain"][data-level="heavy"] > span,
+.precip[data-kind="storm"] > span {
+  width: 1.5px;
+}
+
+.precip[data-kind="snow"] > span {
+  border-radius: 50%;
+  background: rgba(236, 244, 250, 0.92);
+  box-shadow: 0 0 6px rgba(213, 228, 242, 0.55);
+  animation-name: snow-fall;
+  animation-timing-function: linear;
+  animation-iteration-count: infinite;
+}
+
+.precip[data-kind="storm"]::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(720px 300px at 22% -8%, rgba(244, 236, 255, 0.42), transparent 70%),
+    radial-gradient(480px 220px at 82% 6%, rgba(224, 138, 85, 0.22), transparent 68%);
+  opacity: 0;
+  animation: lightning 11s ease-in-out infinite;
+}
+
+@keyframes rain-fall {
+  from { transform: translate3d(0, -12vh, 0) rotate(16deg); }
+  to { transform: translate3d(-7vw, 118vh, 0) rotate(16deg); }
+}
+
+@keyframes snow-fall {
+  0% { transform: translate3d(0, -10vh, 0); }
+  25% { transform: translate3d(var(--drift), 28vh, 0); }
+  50% { transform: translate3d(0, 56vh, 0); }
+  75% { transform: translate3d(calc(var(--drift) * -1), 82vh, 0); }
+  100% { transform: translate3d(0, 118vh, 0); }
+}
+
+@keyframes lightning {
+  0%, 78%, 100% { opacity: 0; }
+  80% { opacity: 0.95; }
+  81.4% { opacity: 0.12; }
+  83% { opacity: 0.55; }
+  86% { opacity: 0; }
+}
+
 .shell {
+  position: relative;
+  z-index: 1;
   width: min(1080px, 100%);
   margin: 0 auto;
   padding:
@@ -382,16 +461,16 @@ body.is-searching { overflow: hidden; }
 }
 
 .now .condition {
-  position: absolute;
-  top: 0.85rem;
-  left: 0.85rem;
+  position: static;
   z-index: 1;
+  grid-row: 1 / span 3;
+  align-self: center;
   flex-direction: column;
-  align-items: flex-start;
+  align-items: center;
   gap: 0.28rem;
-  max-width: min(42%, 8.5rem);
+  max-width: 6.8rem;
   margin: 0;
-  text-align: left;
+  text-align: center;
   line-height: 1.25;
   pointer-events: none;
 }
@@ -436,6 +515,10 @@ body.is-searching { overflow: hidden; }
 
 .now {
   position: relative;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  column-gap: 0.75rem;
+  align-items: center;
   min-width: 0;
   padding: 1.15rem 0.85rem 1rem;
   border: 1px solid var(--line);
@@ -450,6 +533,7 @@ body.is-searching { overflow: hidden; }
 .now-feels,
 .now-range {
   display: flex;
+  grid-column: 2;
   align-items: baseline;
   justify-content: center;
   gap: 0.45rem;
@@ -694,7 +778,6 @@ body.is-searching { overflow: hidden; }
     align-items: end;
   }
   .now { padding: 1.4rem 1rem 1.2rem; }
-  .now .condition { top: 1rem; left: 1rem; }
 }
 
 @media (max-width: 420px) {
@@ -714,6 +797,8 @@ body.is-searching { overflow: hidden; }
     animation: none !important;
     transition: none !important;
   }
+
+  .precip { display: none; }
 
   .progress-bar > span {
     width: 100%;

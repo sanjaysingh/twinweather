@@ -328,6 +328,7 @@ function render(place, forecast) {
   const today = forecast.daily[0];
   const sky = skyFor(forecast.current.weatherCode, forecast.current.isDay);
   document.body.dataset.sky = sky;
+  syncPrecip(forecast.current.weatherCode);
   $("condition-icon").innerHTML = icon(forecast.current.weatherCode, forecast.current.isDay);
   $("condition-label").textContent = CONDITIONS[forecast.current.weatherCode] || "Weather";
   $("place-name").textContent = place.name;
@@ -551,6 +552,68 @@ function skyFor(code, isDay) {
   if ((code >= 71 && code <= 77) || code === 85 || code === 86) return "snow";
   if (code >= 95) return "storm";
   return "overcast";
+}
+
+const FALL = {
+  rain: {
+    light: { count: 26, duration: [1.35, 2.05], length: [8, 14], opacity: 0.38 },
+    mid: { count: 46, duration: [0.85, 1.25], length: [14, 24], opacity: 0.5 },
+    heavy: { count: 70, duration: [0.52, 0.88], length: [18, 34], opacity: 0.62 },
+  },
+  snow: {
+    light: { count: 34, duration: [11, 18], size: [2.5, 4.5], opacity: 0.62, drift: 40 },
+    mid: { count: 58, duration: [9, 15], size: [3, 6], opacity: 0.75, drift: 56 },
+    heavy: { count: 90, duration: [7, 13], size: [3.5, 8], opacity: 0.88, drift: 70 },
+  },
+};
+
+function precipSpec(code) {
+  if (code === 51 || code === 53 || code === 56) return { kind: "rain", level: "light" };
+  if (code === 55 || code === 57 || code === 61 || code === 63 || code === 66 || code === 80 || code === 81) return { kind: "rain", level: "mid" };
+  if (code === 65 || code === 67 || code === 82) return { kind: "rain", level: "heavy" };
+  if (code === 71 || code === 77) return { kind: "snow", level: "light" };
+  if (code === 73 || code === 85) return { kind: "snow", level: "mid" };
+  if (code === 75 || code === 86) return { kind: "snow", level: "heavy" };
+  if (code >= 95) return { kind: "storm", level: "heavy" };
+  return null;
+}
+
+function syncPrecip(code) {
+  const layer = $("precip");
+  if (!layer) return;
+  const spec = precipSpec(code);
+  const next = spec ? `${spec.kind}:${spec.level}` : "";
+  if (layer.dataset.fall === next) return;
+  layer.dataset.fall = next;
+  layer.replaceChildren();
+  if (!spec || window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+    delete layer.dataset.kind;
+    delete layer.dataset.level;
+    return;
+  }
+  const profile = spec.kind === "snow" ? FALL.snow[spec.level] : FALL.rain[spec.level];
+  layer.dataset.kind = spec.kind;
+  layer.dataset.level = spec.level;
+  const bits = document.createDocumentFragment();
+  for (let i = 0; i < profile.count; i++) {
+    const bit = document.createElement("span");
+    const duration = profile.duration[0] + Math.random() * (profile.duration[1] - profile.duration[0]);
+    bit.style.left = `${Math.random() * 100}%`;
+    bit.style.animationDuration = `${duration.toFixed(2)}s`;
+    bit.style.animationDelay = `${(-Math.random() * duration).toFixed(2)}s`;
+    bit.style.opacity = (profile.opacity * (0.45 + Math.random() * 0.55)).toFixed(2);
+    if (spec.kind === "snow") {
+      const size = profile.size[0] + Math.random() * (profile.size[1] - profile.size[0]);
+      bit.style.width = `${size.toFixed(1)}px`;
+      bit.style.height = `${size.toFixed(1)}px`;
+      bit.style.setProperty("--drift", `${Math.round((Math.random() - 0.5) * profile.drift)}px`);
+    } else {
+      const length = profile.length[0] + Math.random() * (profile.length[1] - profile.length[0]);
+      bit.style.height = `${length.toFixed(0)}px`;
+    }
+    bits.appendChild(bit);
+  }
+  layer.append(bits);
 }
 
 function markChip(place) {
