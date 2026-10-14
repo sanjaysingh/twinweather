@@ -425,6 +425,7 @@ function renderHours(forecast, { reveal = false } = {}) {
   const span = Math.max(high - low, 0.5);
   const day = selected ? forecast.daily.find((item) => item.date === selected) : null;
   const focusTime = focusHourTime(hours, day, nowKey);
+  const suns = sunEventsForHours(forecast, hours, selected, forecast.current.time);
   for (const hour of hours) {
     const key = hour.time.slice(0, 13);
     const cell = document.createElement("article");
@@ -449,6 +450,12 @@ function renderHours(forecast, { reveal = false } = {}) {
       cell.append(pop);
     }
     row.append(cell);
+    const start = hour.time.slice(0, 16);
+    const end = hourEnd(hour.time);
+    for (const event of suns) {
+      if (event.time < start || event.time >= end) continue;
+      row.append(sunHourCell(event, forecast.current.time));
+    }
   }
   const focus = focusTime ? row.querySelector(`[data-hour="${focusTime}"]`) : null;
   if (focus) row.scrollLeft = Math.max(0, focus.offsetLeft - 8);
@@ -483,6 +490,69 @@ function dayStamp(date) {
     day: "numeric",
     timeZone: "UTC",
   }).format(new Date(`${date}T12:00:00Z`));
+}
+
+function sunEventsForHours(forecast, hours, selected, nowIso) {
+  if (hours.length === 0) return [];
+  const start = hours[0].time.slice(0, 16);
+  const end = hourEnd(hours[hours.length - 1].time);
+  const now = nowIso.slice(0, 16);
+  const events = [];
+  for (const day of forecast.daily) {
+    if (selected && day.date !== selected) continue;
+    collectSun(events, day.sunrise, "Sunrise", "rise", start, end, selected ? null : now);
+    collectSun(events, day.sunset, "Sunset", "set", start, end, selected ? null : now);
+  }
+  events.sort((a, b) => (a.time < b.time ? -1 : a.time > b.time ? 1 : 0));
+  return events;
+}
+
+function collectSun(events, time, label, kind, start, end, notBefore) {
+  if (typeof time !== "string" || time.length < 16) return;
+  const stamp = time.slice(0, 16);
+  if (stamp < start || stamp >= end) return;
+  if (notBefore && stamp < notBefore) return;
+  events.push({ time: stamp, label, kind });
+}
+
+function hourEnd(iso) {
+  const [date, time] = iso.split("T");
+  const [year, month, day] = date.split("-").map(Number);
+  const hour = Number(time.slice(0, 2));
+  const next = new Date(Date.UTC(year, month - 1, day, hour + 1));
+  const pad = (value) => String(value).padStart(2, "0");
+  return `${next.getUTCFullYear()}-${pad(next.getUTCMonth() + 1)}-${pad(next.getUTCDate())}T${pad(next.getUTCHours())}:00`;
+}
+
+function sunHourCell(event, nowIso) {
+  const cell = document.createElement("article");
+  cell.className = "hour hour-sun";
+  if (event.time < nowIso.slice(0, 16)) cell.classList.add("is-past");
+  const time = document.createElement("time");
+  time.dateTime = event.time;
+  time.textContent = clock(event.time);
+  const sky = document.createElement("span");
+  sky.className = "hour-sun-icon";
+  sky.innerHTML = sunMark(event.kind);
+  const gap = document.createElement("span");
+  gap.className = "hour-sun-gap";
+  gap.setAttribute("aria-hidden", "true");
+  const label = document.createElement("span");
+  label.className = "hour-sun-label";
+  label.textContent = event.label;
+  cell.append(time, sky, gap, label);
+  return cell;
+}
+
+let sunMarkSeq = 0;
+
+function sunMark(kind) {
+  const id = `hour-${kind}-${sunMarkSeq++}`;
+  const rising = kind === "rise";
+  const body = rising
+    ? `<circle class="wx-sun-core" cx="12" cy="15.2" r="3.8"></circle><circle class="wx-sun-hot" cx="12" cy="14.6" r="1.8"></circle><path class="wx-sun-rays" d="M12 7.2v2.4M7.4 9.7l1.3 1.4M16.6 9.7l-1.3 1.4"></path>`
+    : `<circle class="wx-sun-core" cx="12" cy="19.4" r="4.4"></circle><circle class="wx-sun-hot" cx="12" cy="16.6" r="1.3"></circle><path class="wx-sun-rays" d="M12 10.4v2.2M8.6 12.5l1 1.5M15.4 12.5l-1 1.5"></path>`;
+  return `<svg class="sun-mark hour-sun-mark${rising ? "" : " is-set"}" viewBox="2 6 20 14" aria-hidden="true"><defs><clipPath id="${id}"><rect x="0" y="0" width="24" height="18"></rect></clipPath></defs><g class="wx-sun" clip-path="url(#${id})">${body}</g><path class="sun-horizon" d="M3 18h18"></path></svg>`;
 }
 
 function focusHourTime(hours, day, nowKey) {

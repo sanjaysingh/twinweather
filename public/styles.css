@@ -711,6 +711,41 @@ body.is-searching { overflow: hidden; }
 
 .hour svg { width: 22px; height: 22px; margin: 0.4rem auto; display: block; }
 
+.hour-sun-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 22px;
+  margin: 0.4rem auto;
+}
+
+.hour .hour-sun-mark {
+  width: 32px;
+  height: 22px;
+  margin: 0;
+}
+
+.hour-sun-mark.is-set .wx-sun { color: #e8894a; }
+
+.hour-sun-gap {
+  display: block;
+  height: 2.6rem;
+  margin: 0.45rem 0 0.2rem;
+}
+
+.hour-sun-label {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: calc(0.98rem * 1.2 * 2 + 0.05rem);
+  color: var(--paper);
+  font-size: 0.92rem;
+  font-weight: 520;
+  letter-spacing: 0.01em;
+  line-height: 1.1;
+  white-space: nowrap;
+}
+
 .pair {
   display: flex;
   flex-direction: column;
