@@ -57,9 +57,6 @@ const UPSTREAM_HEADERS = {
   "User-Agent": "Twinweather/1.0 (https://twinweather.sanjaysingh.net)",
 };
 
-const CRAWLER =
-  /facebookexternalhit|facebot|twitterbot|linkedinbot|slackbot|discordbot|whatsapp|telegrambot|applebot|pinterest|redditbot|embedly|quora|vkshare|skypeuripreview|googlebot|bingbot|duckduckbot|baiduspider|yandexbot|ia_archiver/i;
-
 export default {
   async fetch(request, env, ctx): Promise<Response> {
     const url = new URL(request.url);
@@ -90,11 +87,9 @@ async function api(ctx: ExecutionContext, url: URL): Promise<Response> {
 async function page(request: Request, env: Env, ctx: ExecutionContext, url: URL): Promise<Response> {
   const shell = await documentShell(env);
   if (!shell.ok || !(shell.headers.get("content-type") || "").includes("text/html")) return shell;
-  const { place, explicit, needsName } = placeFromParams(url.searchParams);
-  const crawler = CRAWLER.test(request.headers.get("user-agent") || "");
-  const resolved = needsName && crawler ? await resolveName(place) : place;
-  const forecast = await shareForecast(resolved.latitude, resolved.longitude, ctx, crawler);
-  const tags = buildTags(requestOrigin(request, url), url, resolved, explicit, forecast ? toReading(forecast) : null);
+  const { place, explicit } = placeFromParams(url.searchParams);
+  await shareForecast(place.latitude, place.longitude, ctx, false);
+  const tags = buildTags(requestOrigin(request, url), url, place, explicit);
   return decorateDocument(shell, tags);
 }
 

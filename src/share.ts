@@ -125,27 +125,11 @@ export function buildTags(
   pageUrl: URL,
   place: SharePlace,
   explicit: boolean,
-  reading: ShareReading | null,
 ): ShareTags {
-  const name = place.name;
   const image = `${origin}/api/og.png?${imageQuery(place)}`;
   const canonical = explicit ? `${origin}/?${placeQuery(place)}` : `${origin}/`;
-  const temps = reading ? pair(reading.temperatureC) : "";
-  const title = reading
-    ? name
-      ? `${temps} in ${name}`
-      : temps
-    : name
-      ? `${name} · Twinweather`
-      : "Twinweather";
-  const description = reading
-    ? `${conditionLine(reading)}. Feels ${pair(reading.apparentC)}.`
-    : "Stop juggling between C and F.";
-  const alt = reading
-    ? `${name ? `${name}, ` : ""}${temps}, ${conditionName(reading.weatherCode, reading.isDay)}`
-    : name
-      ? `Twinweather — ${name}`
-      : "Twinweather — Celsius and Fahrenheit together";
+  const title = "Twinweather";
+  const description = "Stop juggling between C and F.";
   return {
     title,
     description,
@@ -160,7 +144,7 @@ export function buildTags(
       "og:image:type": "image/png",
       "og:image:width": "1200",
       "og:image:height": "630",
-      "og:image:alt": alt,
+      "og:image:alt": "Twinweather — Celsius and Fahrenheit together",
       "twitter:title": title,
       "twitter:description": description,
       "twitter:image": image,
