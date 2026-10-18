@@ -1,3 +1,12 @@
+import {
+  buildTags,
+  decorateDocument,
+  placeFromParams,
+  renderCardPng,
+  type SharePlace,
+  type ShareReading,
+} from "./share";
+
 interface GeocodeHit {
   id: number;
   name: string;
@@ -48,32 +57,185 @@ const UPSTREAM_HEADERS = {
   "User-Agent": "Twinweather/1.0 (https://twinweather.sanjaysingh.net)",
 };
 
+const CRAWLER =
+  /facebookexternalhit|facebot|twitterbot|linkedinbot|slackbot|discordbot|whatsapp|telegrambot|applebot|pinterest|redditbot|embedly|quora|vkshare|skypeuripreview|googlebot|bingbot|duckduckbot|baiduspider|yandexbot|ia_archiver/i;
+
 export default {
-  async fetch(request): Promise<Response> {
+  async fetch(request, env, ctx): Promise<Response> {
     const url = new URL(request.url);
-
-    if (request.method !== "GET") {
-      return json({ error: "Method not allowed." }, 405);
+    if (url.pathname === "/" || url.pathname === "/index.html") {
+      return page(request, env, ctx, url);
     }
-
-    try {
-      if (url.pathname === "/api/geocode") return await geocode(url);
-      if (url.pathname === "/api/reverse") return await reverse(url);
-      if (url.pathname === "/api/forecast") return await forecast(url);
-      return json({ error: "Not found." }, 404);
-    } catch (error) {
-      console.log(
-        JSON.stringify({
-          level: "error",
-          event: "request_failed",
-          path: url.pathname,
-          message: error instanceof Error ? error.message : "unknown",
-        }),
-      );
-      return json({ error: "Weather service is unavailable." }, 502);
+    if (url.pathname.startsWith("/api/")) {
+      if (request.method !== "GET") return json({ error: "Method not allowed." }, 405);
+      return api(ctx, url);
     }
+    return env.ASSETS.fetch(request);
   },
-} satisfies ExportedHandler;
+} satisfies ExportedHandler<Env>;
+
+async function api(ctx: ExecutionContext, url: URL): Promise<Response> {
+  try {
+    if (url.pathname === "/api/geocode") return await geocode(url);
+    if (url.pathname === "/api/reverse") return await reverse(url);
+    if (url.pathname === "/api/forecast") return await forecast(url);
+    if (url.pathname === "/api/og.png") return await ogImage(ctx, url);
+    return json({ error: "Not found." }, 404);
+  } catch (error) {
+    logFailure(url.pathname, error);
+    return json({ error: "Weather service is unavailable." }, 502);
+  }
+}
+
+async function page(request: Request, env: Env, ctx: ExecutionContext, url: URL): Promise<Response> {
+  const shell = await documentShell(env);
+  if (!shell.ok || !(shell.headers.get("content-type") || "").includes("text/html")) return shell;
+  const { place, explicit, needsName } = placeFromParams(url.searchParams);
+  const resolved = needsName ? await resolveName(place) : place;
+  const crawler = CRAWLER.test(request.headers.get("user-agent") || "");
+  const forecast = await shareForecast(resolved.latitude, resolved.longitude, ctx, crawler);
+  const tags = buildTags(requestOrigin(request, url), url, resolved, explicit, forecast ? toReading(forecast) : null);
+  return decorateDocument(shell, tags);
+}
+
+async function ogImage(ctx: ExecutionContext, url: URL): Promise<Response> {
+  const { place, needsName } = placeFromParams(url.searchParams);
+  const resolved = needsName ? await resolveName(place) : place;
+  let reading: ShareReading | null = null;
+  try {
+    const forecast = await shareForecast(resolved.latitude, resolved.longitude, ctx, true);
+    reading = forecast ? toReading(forecast) : null;
+  } catch (error) {
+    logFailure(url.pathname, error);
+  }
+  try {
+    const png = await renderCardPng(resolved, reading);
+    const headers = new Headers({
+      "Content-Type": "image/png",
+      "X-Content-Type-Options": "nosniff",
+      "Cache-Control": "public, max-age=600",
+    });
+    return new Response(png, { headers });
+  } catch (error) {
+    logFailure(url.pathname, error);
+    return json({ error: "Could not draw the share card." }, 502);
+  }
+}
+
+function documentShell(env: Env): Promise<Response> {
+  return env.ASSETS.fetch(new Request("https://assets.local/index.html"));
+}
+
+function requestOrigin(_request: Request, url: URL): string {
+  if (url.hostname === "twinweather.sanjaysingh.net") return "https://twinweather.sanjaysingh.net";
+  return url.origin;
+}
+
+async function resolveName(place: SharePlace): Promise<SharePlace> {
+  if (place.name) return place;
+  try {
+    const found = await lookupPlace(place.latitude, place.longitude);
+    if (!found) return place;
+    return {
+      ...place,
+      name: found.name,
+      admin1: place.admin1 || found.admin1,
+      country: place.country || found.country,
+    };
+  } catch (error) {
+    logFailure("reverse", error);
+    return place;
+  }
+}
+
+function toReading(forecast: ForecastPayload): ShareReading {
+  const nowKey = forecast.current.time.slice(0, 13);
+  const hour = forecast.hourly.find((slot) => slot.time.slice(0, 13) >= nowKey) ?? forecast.hourly[0];
+  const today = forecast.daily[0];
+  return {
+    temperatureC: forecast.current.temperatureC,
+    apparentC: forecast.current.apparentC,
+    lowC: today?.minC ?? forecast.current.temperatureC,
+    highC: today?.maxC ?? forecast.current.temperatureC,
+    weatherCode: forecast.current.weatherCode,
+    isDay: forecast.current.isDay,
+    precipProb: hour?.precipProb ?? 0,
+  };
+}
+
+async function shareForecast(
+  latitude: string,
+  longitude: string,
+  ctx: ExecutionContext,
+  wait: boolean,
+): Promise<ForecastPayload | null> {
+  const cached = await readForecastCache(latitude, longitude);
+  if (cached) return cached;
+  const pending = loadForecast(latitude, longitude)
+    .then(async (shaped) => {
+      await storeForecast(latitude, longitude, shaped);
+      return shaped;
+    })
+    .catch((error: unknown) => {
+      logFailure("share_forecast", error);
+      return null;
+    });
+  if (!wait) {
+    ctx.waitUntil(pending.then(() => undefined));
+    return null;
+  }
+  return pending;
+}
+
+function forecastKey(latitude: string, longitude: string): Request {
+  return new Request(`https://twinweather.internal/forecast/${latitude}/${longitude}`);
+}
+
+async function readForecastCache(latitude: string, longitude: string): Promise<ForecastPayload | null> {
+  try {
+    const hit = await caches.default.match(forecastKey(latitude, longitude));
+    if (!hit) return null;
+    const payload: unknown = await hit.json();
+    return isForecast(payload) ? payload : null;
+  } catch {
+    return null;
+  }
+}
+
+async function storeForecast(latitude: string, longitude: string, shaped: ForecastPayload): Promise<void> {
+  try {
+    await caches.default.put(forecastKey(latitude, longitude), json(shaped, 200, 600, 600));
+  } catch {
+    // Local dev may not expose the default cache.
+  }
+}
+
+function isForecast(value: unknown): value is ForecastPayload {
+  const record = asRecord(value);
+  const current = record ? asRecord(record.current) : null;
+  const today = record ? asRecord(asArray(record.daily)[0]) : null;
+  if (!current || !today) return false;
+  return (
+    typeof current.temperatureC === "number" &&
+    typeof current.apparentC === "number" &&
+    typeof current.weatherCode === "number" &&
+    typeof current.isDay === "boolean" &&
+    typeof current.time === "string" &&
+    typeof today.minC === "number" &&
+    typeof today.maxC === "number" &&
+    Array.isArray(record?.hourly)
+  );
+}
+
+function logFailure(event: string, error: unknown): void {
+  console.log(
+    JSON.stringify({
+      level: "error",
+      event,
+      message: error instanceof Error ? error.message : "unknown",
+    }),
+  );
+}
 
 async function geocode(url: URL): Promise<Response> {
   const query = cleanQuery(url.searchParams.get("q"));
@@ -97,7 +259,29 @@ async function reverse(url: URL): Promise<Response> {
   if (latitude == null || longitude == null) {
     return json({ error: "A valid location is required." }, 400);
   }
+  const found = await lookupPlace(latitude, longitude);
+  if (!found) return json({ result: null }, 200, 3600);
+  return json(
+    {
+      result: {
+        id: 0,
+        name: found.name,
+        latitude: Number(latitude),
+        longitude: Number(longitude),
+        country: found.country,
+        ...(found.admin1 ? { admin1: found.admin1 } : {}),
+      },
+    },
+    200,
+    86_400,
+    86_400,
+  );
+}
 
+async function lookupPlace(
+  latitude: string,
+  longitude: string,
+): Promise<{ name: string; admin1: string; country: string } | null> {
   const upstream = new URL("https://nominatim.openstreetmap.org/reverse");
   upstream.searchParams.set("lat", latitude);
   upstream.searchParams.set("lon", longitude);
@@ -120,24 +304,12 @@ async function reverse(url: URL): Promise<Response> {
       asString(address.suburb) ||
       asString(address.county)
     : null;
-  if (!name) return json({ result: null }, 200, 3600);
-
-  const admin1 = asString(address?.state);
-  return json(
-    {
-      result: {
-        id: 0,
-        name,
-        latitude: Number(latitude),
-        longitude: Number(longitude),
-        country: asString(address?.country) || "",
-        ...(admin1 ? { admin1 } : {}),
-      },
-    },
-    200,
-    86_400,
-    86_400,
-  );
+  if (!name) return null;
+  return {
+    name,
+    admin1: asString(address?.state) || "",
+    country: asString(address?.country) || "",
+  };
 }
 
 async function forecast(url: URL): Promise<Response> {
@@ -146,7 +318,12 @@ async function forecast(url: URL): Promise<Response> {
   if (latitude == null || longitude == null) {
     return json({ error: "A valid location is required." }, 400);
   }
+  // User actions (open / locate / search) bust the URL; keep the edge from
+  // holding a shared forecast that can outlive the weather outside.
+  return json(await loadForecast(latitude, longitude), 200);
+}
 
+async function loadForecast(latitude: string, longitude: string): Promise<ForecastPayload> {
   const upstream = new URL("https://api.open-meteo.com/v1/forecast");
   upstream.searchParams.set("latitude", latitude);
   upstream.searchParams.set("longitude", longitude);
@@ -190,9 +367,7 @@ async function forecast(url: URL): Promise<Response> {
   const payload = await readJson(upstream, UPSTREAM_HEADERS);
   const shaped = shapeForecast(payload);
   if (!shaped) throw new Error("forecast payload missing required fields");
-  // User actions (open / locate / search) bust the URL; keep the edge from
-  // holding a shared forecast that can outlive the weather outside.
-  return json(shaped, 200);
+  return shaped;
 }
 
 function shapeForecast(payload: Record<string, unknown>): ForecastPayload | null {

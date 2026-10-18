@@ -121,6 +121,11 @@ if ("serviceWorker" in navigator) {
 }
 
 async function boot() {
+  const linked = await placeFromUrl();
+  if (linked) {
+    await selectPlace(linked);
+    return;
+  }
   const saved = readSaved();
   if (saved) {
     touchRecent(saved);
@@ -272,6 +277,7 @@ async function selectPlace(place, { remember = true } = {}) {
   const alreadyShowing = previousKey === placeKey(next) && state.hasForecast;
   state.locating = false;
   state.place = next;
+  writePlaceUrl(next);
   if (remember) {
     localStorage.setItem("twinweather-place", JSON.stringify(state.place));
     touchRecent(state.place);
@@ -667,6 +673,52 @@ function roundTemp(value) {
   return Object.is(rounded, -0) ? 0 : rounded;
 }
 
+function writePlaceUrl(place) {
+  const url = new URL(`${window.location.origin}/`);
+  url.searchParams.set("lat", Number(place.latitude).toFixed(2));
+  url.searchParams.set("lon", Number(place.longitude).toFixed(2));
+  if (place.name && place.name !== "Current location" && place.name !== "Selected place") {
+    url.searchParams.set("name", place.name);
+  }
+  if (place.admin1) url.searchParams.set("admin1", place.admin1);
+  if (place.country) url.searchParams.set("country", place.country);
+  const next = `${url.pathname}${url.search}`;
+  const current = `${window.location.pathname}${window.location.search}`;
+  if (next !== current) history.replaceState(null, "", next);
+}
+
+async function placeFromUrl() {
+  const params = new URLSearchParams(window.location.search);
+  const latRaw = params.get("lat");
+  const lonRaw = params.get("lon");
+  if (latRaw == null || lonRaw == null || !latRaw.trim() || !lonRaw.trim()) return null;
+  const latitude = Number(latRaw);
+  const longitude = Number(lonRaw);
+  if (!Number.isFinite(latitude) || latitude < -90 || latitude > 90) return null;
+  if (!Number.isFinite(longitude) || longitude < -180 || longitude > 180) return null;
+  const name = cleanLabel(params.get("name"));
+  const admin1 = cleanLabel(params.get("admin1"));
+  const country = cleanLabel(params.get("country"));
+  if (name) return normalizePlace({ name, admin1, country, latitude, longitude });
+  try {
+    const response = await fetch(`/api/reverse?latitude=${latitude.toFixed(2)}&longitude=${longitude.toFixed(2)}`);
+    const payload = await response.json();
+    if (payload.result && typeof payload.result.name === "string") {
+      return normalizePlace({ ...payload.result, latitude, longitude });
+    }
+  } catch {
+    // Coordinates still open a forecast; the name stays generic.
+  }
+  return normalizePlace({ name: "Selected place", admin1, country, latitude, longitude });
+}
+
+function cleanLabel(value) {
+  if (typeof value !== "string") return "";
+  const clean = value.replace(/[\u0000-\u001F\u007F]/g, "").replace(/\s+/g, " ").trim();
+  if (!clean || clean.length > 80) return "";
+  return clean;
+}
+
 function roundCoord(value) {
   return (Math.round(Number(value) * 100) / 100).toFixed(2);
 }
@@ -817,7 +869,13 @@ function markChip(place) {
 }
 
 function isRememberablePlace(place) {
-  return Boolean(place && typeof place.name === "string" && place.name && place.name !== "Current location");
+  return Boolean(
+    place &&
+      typeof place.name === "string" &&
+      place.name &&
+      place.name !== "Current location" &&
+      place.name !== "Selected place",
+  );
 }
 
 function readRecent() {
@@ -876,7 +934,7 @@ function readSaved() {
     const raw = localStorage.getItem("twinweather-place") || localStorage.getItem("both-place");
     if (!raw) return null;
     const place = JSON.parse(raw);
-    if (!place || typeof place.name !== "string" || place.name === "Current location") return null;
+    if (!place || typeof place.name !== "string" || place.name === "Current location" || place.name === "Selected place") return null;
     if (!Number.isFinite(Number(place.latitude)) || !Number.isFinite(Number(place.longitude))) return null;
     return place;
   } catch {
