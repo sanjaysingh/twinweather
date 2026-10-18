@@ -6,6 +6,8 @@ on:
       - main
     paths:
       - "src/**"
+      - "public/**"
+      - "scripts/**"
       - "wrangler.jsonc"
       - "package.json"
       - "package-lock.json"
@@ -32,6 +34,8 @@ jobs:
           cache: npm
       - name: Install
         run: npm ci
+      - name: Version cached assets
+        run: node scripts/version-assets.mjs
       - name: Deploy Worker
         uses: cloudflare/wrangler-action@v4
         with:

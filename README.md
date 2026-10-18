@@ -8,6 +8,8 @@ The current reading is one line, `18°C | 64°F`. The next 24 hours and the next
 
 Search opens over the page and closes after a place is chosen. On a later visit the last city is remembered in the browser. The first visit uses New York, unless location permission was already granted.
 
+The address bar follows the city on screen. Copy that link to open the same place. The share card shows that city's weather, in both Celsius and Fahrenheit. A link with no city uses New York.
+
 On a phone, Twinweather can be added to the home screen and opened like an app.
 
 ## How the weather is chosen
@@ -37,11 +39,13 @@ If the forecast has no hours inside sunrise and sunset, the day falls back to Op
 
 ## How it is hosted
 
-The pages are static files on GitHub Pages. `https://twinweather.sanjaysingh.net/api/*` is a Cloudflare Worker on the same hostname.
+The Cloudflare Worker serves the site and the API on `twinweather.sanjaysingh.net`. It fills in the share card for the city in the link. GitHub Pages receives the same static files.
 
 | Request | What happens |
 | --- | --- |
-| Pages, styles, and the app icon | GitHub Pages |
+| Pages, styles, and the app icon | The Worker, from the files in `public/` |
+| `/` and `/?lat=&lon=` | Share title and image for that city. No city means New York. |
+| `/api/og.png` | The share image |
 | `/api/forecast` | Open-Meteo forecast, shaped for the page |
 | `/api/geocode` | Open-Meteo place search |
 | `/api/reverse` | Nominatim, used when the browser shares a location |
