@@ -99,33 +99,25 @@ export function placeFromParams(params: URLSearchParams): {
   explicit: boolean;
   needsName: boolean;
 } {
-  const latitude = coord(params.get("lat"), -90, 90);
-  const longitude = coord(params.get("lon"), -180, 180);
-  if (!latitude || !longitude) {
+  const found = coordsFromParams(params);
+  if (!found) {
     return { place: { ...DEFAULT_PLACE }, explicit: false, needsName: false };
   }
-  const name = label(params.get("name"));
   return {
     place: {
-      latitude,
-      longitude,
-      name,
-      admin1: label(params.get("admin1")),
-      country: label(params.get("country")),
+      latitude: found.latitude,
+      longitude: found.longitude,
+      name: "",
+      admin1: "",
+      country: "",
     },
     explicit: true,
-    needsName: name.length === 0,
+    needsName: true,
   };
 }
 
 export function placeQuery(place: SharePlace): string {
-  const params = new URLSearchParams();
-  params.set("lat", place.latitude);
-  params.set("lon", place.longitude);
-  if (place.name) params.set("name", place.name);
-  if (place.admin1) params.set("admin1", place.admin1);
-  if (place.country) params.set("country", place.country);
-  return params.toString();
+  return `l=${place.latitude},${place.longitude}`;
 }
 
 export function buildTags(
@@ -135,14 +127,25 @@ export function buildTags(
   explicit: boolean,
   reading: ShareReading | null,
 ): ShareTags {
-  const name = displayName(place);
+  const name = place.name;
   const image = `${origin}/api/og.png?${imageQuery(place)}`;
   const canonical = explicit ? `${origin}/?${placeQuery(place)}` : `${origin}/`;
-  const title = reading ? `${pair(reading.temperatureC)} in ${name}` : `${name} · Twinweather`;
+  const temps = reading ? pair(reading.temperatureC) : "";
+  const title = reading
+    ? name
+      ? `${temps} in ${name}`
+      : temps
+    : name
+      ? `${name} · Twinweather`
+      : "Twinweather";
   const description = reading
     ? `${conditionLine(reading)}. Feels ${pair(reading.apparentC)}.`
     : "Stop juggling between C and F.";
-  const alt = reading ? `${name}, ${pair(reading.temperatureC)}, ${conditionName(reading.weatherCode, reading.isDay)}` : `Twinweather — ${name}`;
+  const alt = reading
+    ? `${name ? `${name}, ` : ""}${temps}, ${conditionName(reading.weatherCode, reading.isDay)}`
+    : name
+      ? `Twinweather — ${name}`
+      : "Twinweather — Celsius and Fahrenheit together";
   return {
     title,
     description,
@@ -295,9 +298,24 @@ function fallbackLines(shift: number): string {
 }
 
 function imageQuery(place: SharePlace): string {
-  const params = new URLSearchParams(placeQuery(place));
-  params.set("t", new Date().toISOString().slice(0, 13).replace(/[-T]/g, ""));
-  return params.toString();
+  const stamp = new Date().toISOString().slice(0, 13).replace(/[-T]/g, "");
+  return `${placeQuery(place)}&t=${stamp}`;
+}
+
+function coordsFromParams(params: URLSearchParams): { latitude: string; longitude: string } | null {
+  const combined = params.get("l");
+  if (combined) {
+    const splitAt = combined.indexOf(",");
+    if (splitAt > 0) {
+      const latitude = coord(combined.slice(0, splitAt), -90, 90);
+      const longitude = coord(combined.slice(splitAt + 1), -180, 180);
+      if (latitude && longitude) return { latitude, longitude };
+    }
+  }
+  const latitude = coord(params.get("lat"), -90, 90);
+  const longitude = coord(params.get("lon"), -180, 180);
+  if (latitude && longitude) return { latitude, longitude };
+  return null;
 }
 
 function regionLine(place: SharePlace): string {
@@ -367,13 +385,6 @@ function coord(raw: string | null, min: number, max: number): string | null {
   const value = Number(raw);
   if (!Number.isFinite(value) || value < min || value > max) return null;
   return value.toFixed(2);
-}
-
-function label(raw: string | null): string {
-  if (!raw) return "";
-  const clean = raw.replace(/[\u0000-\u001F\u007F]/g, "").replace(/\s+/g, " ").trim();
-  if (!clean || clean.length > 80) return "";
-  return clean;
 }
 
 function escapeXml(value: string): string {

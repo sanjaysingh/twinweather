@@ -91,8 +91,8 @@ async function page(request: Request, env: Env, ctx: ExecutionContext, url: URL)
   const shell = await documentShell(env);
   if (!shell.ok || !(shell.headers.get("content-type") || "").includes("text/html")) return shell;
   const { place, explicit, needsName } = placeFromParams(url.searchParams);
-  const resolved = needsName ? await resolveName(place) : place;
   const crawler = CRAWLER.test(request.headers.get("user-agent") || "");
+  const resolved = needsName && crawler ? await resolveName(place) : place;
   const forecast = await shareForecast(resolved.latitude, resolved.longitude, ctx, crawler);
   const tags = buildTags(requestOrigin(request, url), url, resolved, explicit, forecast ? toReading(forecast) : null);
   return decorateDocument(shell, tags);

@@ -7,7 +7,7 @@
   "routes": [
     {
       // Query strings only match a pattern that ends in *. The share card
-      // reads ?lat=&lon= on the page itself, then proxies other files onward.
+      // reads ?l= on the page itself, then proxies other files onward.
       "pattern": "twinweather.sanjaysingh.net/*",
       "zone_id": "0cf0b9c4853d3580457fd97e4081d5d9"
     }

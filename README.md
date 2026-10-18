@@ -44,7 +44,7 @@ The Cloudflare Worker serves the site and the API on `twinweather.sanjaysingh.ne
 | Request | What happens |
 | --- | --- |
 | Pages, styles, and the app icon | The Worker, from the files in `public/` |
-| `/` and `/?lat=&lon=` | Share title and image for that city. No city means New York. |
+| `/` and `/?l=40.71,-74.01` | Share title and image for that point. No point means New York. |
 | `/api/og.png` | The share image |
 | `/api/forecast` | Open-Meteo forecast, shaped for the page |
 | `/api/geocode` | Open-Meteo place search |

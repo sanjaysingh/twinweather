@@ -674,32 +674,17 @@ function roundTemp(value) {
 }
 
 function writePlaceUrl(place) {
-  const url = new URL(`${window.location.origin}/`);
-  url.searchParams.set("lat", Number(place.latitude).toFixed(2));
-  url.searchParams.set("lon", Number(place.longitude).toFixed(2));
-  if (place.name && place.name !== "Current location" && place.name !== "Selected place") {
-    url.searchParams.set("name", place.name);
-  }
-  if (place.admin1) url.searchParams.set("admin1", place.admin1);
-  if (place.country) url.searchParams.set("country", place.country);
-  const next = `${url.pathname}${url.search}`;
+  const latitude = Number(place.latitude).toFixed(2);
+  const longitude = Number(place.longitude).toFixed(2);
+  const next = `/?l=${latitude},${longitude}`;
   const current = `${window.location.pathname}${window.location.search}`;
   if (next !== current) history.replaceState(null, "", next);
 }
 
 async function placeFromUrl() {
-  const params = new URLSearchParams(window.location.search);
-  const latRaw = params.get("lat");
-  const lonRaw = params.get("lon");
-  if (latRaw == null || lonRaw == null || !latRaw.trim() || !lonRaw.trim()) return null;
-  const latitude = Number(latRaw);
-  const longitude = Number(lonRaw);
-  if (!Number.isFinite(latitude) || latitude < -90 || latitude > 90) return null;
-  if (!Number.isFinite(longitude) || longitude < -180 || longitude > 180) return null;
-  const name = cleanLabel(params.get("name"));
-  const admin1 = cleanLabel(params.get("admin1"));
-  const country = cleanLabel(params.get("country"));
-  if (name) return normalizePlace({ name, admin1, country, latitude, longitude });
+  const coords = coordsFromSearch(new URLSearchParams(window.location.search));
+  if (!coords) return null;
+  const { latitude, longitude } = coords;
   try {
     const response = await fetch(`/api/reverse?latitude=${latitude.toFixed(2)}&longitude=${longitude.toFixed(2)}`);
     const payload = await response.json();
@@ -709,14 +694,28 @@ async function placeFromUrl() {
   } catch {
     // Coordinates still open a forecast; the name stays generic.
   }
-  return normalizePlace({ name: "Selected place", admin1, country, latitude, longitude });
+  return normalizePlace({ name: "Selected place", latitude, longitude });
 }
 
-function cleanLabel(value) {
-  if (typeof value !== "string") return "";
-  const clean = value.replace(/[\u0000-\u001F\u007F]/g, "").replace(/\s+/g, " ").trim();
-  if (!clean || clean.length > 80) return "";
-  return clean;
+function coordsFromSearch(params) {
+  const combined = params.get("l");
+  if (combined) {
+    const splitAt = combined.indexOf(",");
+    if (splitAt > 0) {
+      const parsed = parseCoord(combined.slice(0, splitAt), combined.slice(splitAt + 1));
+      if (parsed) return parsed;
+    }
+  }
+  return parseCoord(params.get("lat"), params.get("lon"));
+}
+
+function parseCoord(latRaw, lonRaw) {
+  if (latRaw == null || lonRaw == null || !String(latRaw).trim() || !String(lonRaw).trim()) return null;
+  const latitude = Number(latRaw);
+  const longitude = Number(lonRaw);
+  if (!Number.isFinite(latitude) || latitude < -90 || latitude > 90) return null;
+  if (!Number.isFinite(longitude) || longitude < -180 || longitude > 180) return null;
+  return { latitude, longitude };
 }
 
 function roundCoord(value) {
